@@ -1,0 +1,38 @@
+[project]
+name = "isos-data-worker"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Bervin Joey", email = "bervin_j@etna-alternance.net" },
+    { name = "Huber Vincent", email = "bervin_j@etna-alternance.net" },
+    { name = "Diard Benjamin", email = "bervin_j@etna-alternance.net" },
+    { name = "Rotaru Iulian", email = "bervin_j@etna-alternance.net" },
+    { name = "Miri Rabab", email = "bervin_j@etna-alternance.net" },
+    { name = "... Zora", email = "bervin_j@etna-alternance.net" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.43.63",
+    "httpx[http2]>=0.28.1",
+    "loguru>=0.7.3",
+    "lxml>=6.1.1",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "tenacity>=9.1.4",
+]
+
+[project.scripts]
+isos-data-worker = "isos_data_worker:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+    "ruff>=0.16.1",
+]
