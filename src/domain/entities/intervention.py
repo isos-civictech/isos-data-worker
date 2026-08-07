@@ -1,4 +1,3 @@
-# src/domain/entities/intervention.py
 """
 Intervention — one speech by one person inside a DebatePoint.
 

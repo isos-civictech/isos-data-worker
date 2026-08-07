@@ -1,4 +1,3 @@
-# src/domain/entities/debate_point.py
 """
 DebatePoint — one agenda item inside a Debate, discussing one specific Law.
 All Interventions inside a DebatePoint are about ONE Law only.
@@ -10,8 +9,6 @@ XML path: compteRendu/pointsOrdreJour/point
     title     → point/libelle
     order     → position in the pointsOrdreJour list (1-indexed)
 
-Interventions are linked to their DebatePoint via pointODJRef in the XML:
-    intervention/pointODJRef == point/uid
 """
 from pydantic import BaseModel
 from src.domain.entities.intervention import Intervention

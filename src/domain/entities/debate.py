@@ -1,4 +1,3 @@
-# src/domain/entities/debate.py
 """
 Debate — one parliamentary session (an Episode in our Netflix metaphor).
 
