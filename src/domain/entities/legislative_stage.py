@@ -1,4 +1,3 @@
-# src/domain/entities/legislative_stage.py
 """
 LegislativeStage entity — one step in the parliamentary shuttle.
 
