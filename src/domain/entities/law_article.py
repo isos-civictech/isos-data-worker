@@ -8,7 +8,7 @@ S3 path: raw/law_articles/{legislature}/{texte_uid}/{article_ref}_{version}.html
 """
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 class ArticleVersion(str, Enum):
@@ -18,6 +18,11 @@ class ArticleVersion(str, Enum):
 
 
 class LawArticle(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
     texte_uid: NotBlankStr
     article_ref: NotBlankStr
     article_number: int | None = None
@@ -29,6 +34,3 @@ class LawArticle(BaseModel):
 
     # ── S3 ────────────────────────────────────────────────────────────────────
     s3_key: str | None = None
-
-    class Config:
-        from_attributes = True

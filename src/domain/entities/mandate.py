@@ -21,7 +21,7 @@ XML field mapping (inside acteur/PA{id}.xml):
 """
 
 from datetime import date
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
@@ -30,6 +30,10 @@ class Mandate(BaseModel):
     Represents a single term in the National Assembly.
     One person (Deputy) → one Mandate per legislature.
     """
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
     uid: NotBlankStr
     deputy_uid: NotBlankStr
@@ -41,7 +45,7 @@ class Mandate(BaseModel):
     group_acronym: NotBlankStr
     group_name: NotBlankStr
 
-    constituency_number: int
+    constituency_number: int | None = None
     department_name: NotBlankStr
     department_number: NotBlankStr
 
@@ -51,6 +55,3 @@ class Mandate(BaseModel):
     @property
     def is_active(self) -> bool:
         return self.mandate_end is None or self.mandate_end > date.today()
-
-    class Config:
-        from_attributes = True

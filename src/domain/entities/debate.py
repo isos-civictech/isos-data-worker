@@ -1,6 +1,11 @@
 """
 Debate — one parliamentary session (an Episode in our Netflix metaphor).
 
+⚠️  AVERTISSEMENT SYCERON XML :
+    Le flux Syceron ne suit aucun schéma fixe.
+    Le nom du champ date peut être :
+    dateSeance | DateSeance | Date_Seance | date_seance
+
 A Debate is structured as ordered DebatePoints.
 Each DebatePoint discusses one Law and holds its own Interventions.
 
@@ -18,9 +23,9 @@ XML field mapping:
 
 S3 path: raw/debates/{legislature}/{year}/{month}/{uid}.xml
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from src.domain.entities.debate_point import DebatePoint
 from src.domain.shared.validators import Legislature, NotBlankStr
 
@@ -32,7 +37,11 @@ class SessionType(str, Enum):
 
 
 class Debate(BaseModel):
-    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
     uid: NotBlankStr
     legislature: Legislature
     session_number: int | None = None
@@ -49,7 +58,14 @@ class Debate(BaseModel):
     @computed_field
     @property
     def law_references(self) -> list[str]:
-        return [p.texte_uid for p in self.points if p.texte_uid is not None]
-
-    class Config:
-        from_attributes = True
+        """
+        All unique texte_refs values discussed in this debate.--
+        """
+        seen = set()
+        result = []
+        for point in self.points:
+            for ref in point.texte_refs:
+                if ref not in seen:
+                    seen.add(ref)
+                    result.append(ref)
+        return result

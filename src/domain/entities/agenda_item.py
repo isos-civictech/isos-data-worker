@@ -27,7 +27,7 @@ Lifecycle:
 
 S3 path: raw/agenda/{legislature}/{year}/{month}/Agenda.xml.zip (full ZIP)
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pydantic import BaseModel, Field, computed_field, ConfigDict
 from src.domain.shared.validators import Legislature, NotBlankStr
@@ -43,7 +43,7 @@ class AgendaItem(BaseModel):
         populate_by_name=True,
         from_attributes=True,
     )
-        
+
     uid: NotBlankStr
     legislature: Legislature
     start_date: datetime = Field(alias="date_debut")
@@ -60,10 +60,14 @@ class AgendaItem(BaseModel):
     def status(self) -> SessionStatus:
         if self.cancelled:
             return SessionStatus.CANCELLED
-        now = datetime.now().astimezone()
-        if now < self.start_date.astimezone():
+        now = datetime.now(tz=timezone.utc)
+        start = self.start_date if self.start_date.tzinfo else self.start_date.replace(tzinfo=timezone.utc)
+        end = None
+        if self.end_date:
+            end = self.end_date if self.end_date.tzinfo else self.end_date.replace(tzinfo=timezone.utc)
+        if now < start:
             return SessionStatus.SCHEDULED
-        if self.end_date and now > self.end_date.astimezone():
+        if end and now > end:
             return SessionStatus.COMPLETED
         return SessionStatus.ONGOING
 
@@ -71,3 +75,4 @@ class AgendaItem(BaseModel):
     @property
     def is_ready_to_scrape(self) -> bool:
         return self.status == SessionStatus.COMPLETED and self.debate_uid is None
+    

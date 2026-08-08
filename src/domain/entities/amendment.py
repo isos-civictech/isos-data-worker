@@ -21,15 +21,15 @@ S3 path: raw/amendments/{legislature}/{texte_uid}/{uid}.xml
 """
 
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
 class AmendmentAuthorType(str, Enum):
-    DEPUTY = "député(e)"
-    GROUP = "groupe"
-    GOVERNMENT = "gouvernement"
-    COMMISSION = "commission"
+    DEPUTY = "Député"
+    GROUP = "Groupe"
+    GOVERNMENT = "Gouvernement"
+    COMMISSION = "Commission"
 
 class AmendmentSort(str, Enum):
     ADOPTED = "Adopté"
@@ -38,11 +38,16 @@ class AmendmentSort(str, Enum):
     LAPSED = "Tombé"
     INADMISSIBLE = "Irrecevable"
     UNSUPPORTED = "Non soutenu"
-    PENDING = "en_attente"          # default
+    UNREPORTED    = "Non renseigné" 
+    PENDING = "En attente"
 
 
 class Amendment(BaseModel):
-    
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
     uid: NotBlankStr
     legislature: Legislature
     texte_uid: NotBlankStr
@@ -57,6 +62,3 @@ class Amendment(BaseModel):
 
     # ── S3 ────────────────────────────────────────────────────────────────────
     s3_key: str | None = None
-
-    class Config:
-        from_attributes = True

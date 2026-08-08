@@ -2,43 +2,43 @@
 Law entity — represents a legislative dossier (the Series in our Netflix metaphor).
 
 Sources:
-    ZIP JSON : https://data.assemblee-nationale.fr/static/openData/repository/
-                17/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip
-    ZIP XML  : https://data.assemblee-nationale.fr/static/openData/repository/
-                17/loi/dossiers_legislatifs/Dossiers_Legislatifs.xml.zip
-    Portal   : https://data.assemblee-nationale.fr/travaux-parlementaires/dossiers-legislatifs
+    ZIP JSON: https://data.assemblee-nationale.fr/static/openData/repository/
+                {legislature}/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip
+    Portal  : https://data.assemblee-nationale.fr/travaux-parlementaires/dossiers-legislatifs
 
-JSON field mapping:
-    dossier_uid    → dossierLegislatif/uid
-    texte_uid      → dossierLegislatif/textes[0]/uid
-    legislature    → dossierLegislatif/legislature
-    title          → dossierLegislatif/titrePrincipal
-    law_type       → dossierLegislatif/textes[0]/type  ("PRJL" or "PION")
-    themes         → dossierLegislatif/themes[]
-    stages         → dossierLegislatif/actesLegislatifs[]
-    status         → derived from stages — see is_promulgated, current_stage
+JSON field mapping (root key: dossierParlementaire):
+    dossier_uid    → dossierParlementaire/uid
+    legislature    → dossierParlementaire/legislature
+    title          → dossierParlementaire/titreDossier/titre
+    law_type       → dossierParlementaire/procedureParlementaire/code
+    texte_uid      → found by adapter inside actesLegislatifs tree via texteAssocie
+
+    stages         → actesLegislatifs tree (RECURSIVE — see adapter)
+                    ⚠️ acteLegislatif is a DICT if 1 acte, a LIST if multiple
+
+    initiateur:
+        if acteurs/acteur/acteurRef present → deputy proposer (acteurRef = PA...)
+        if null or organe only             → government bill
+
 """
 from enum import Enum
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from src.domain.entities.legislative_stage import LegislativeStage
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
 class LawType(str, Enum):
     """
-    Origin of the law.
-    PRJL = Projet de loi — comes from the government.
-    PION = Proposition de loi — comes from a deputy.
+    procedureParlementaire/code values from real DLR files.
+    ⚠️ Complete this enum as more codes are discovered.
     """
-    GOVERNMENT_BILL = "PRJL"
-    MEMBER_BILL = "PION"
-    OTHER = "OTHER"
+    ORDINARY_MEMBER_BILL = "2"   # Proposition de loi ordinaire
+    INFORMATION_REPORT = "19"  # Rapport d'information sans mission
+    # probably "1" for Projet de loi (government) — to confirm
+    OTHER = "0"                  # fallback for unknown codes
 
 
 class LawStatus(str, Enum):
-    """
-    Current status of the law.
-    """
     IN_PROGRESS = "en cours d'examen"
     ADOPTED = "adopté"
     REJECTED = "rejeté"
@@ -46,31 +46,41 @@ class LawStatus(str, Enum):
 
 
 class Law(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
     dossier_uid: NotBlankStr
-    texte_uid: NotBlankStr
+    texte_uid: NotBlankStr | None = None
     legislature: Legislature
     title: NotBlankStr
     law_type: LawType
-    themes: list[str] = []
-    status: LawStatus = LawStatus.IN_PROGRESS
+
+    # "PA775234" if deputy, None if government/null
+    initiateur_uid: str | None = None
     stages: list[LegislativeStage] = []
+    closure_status: LawStatus | None = None
+
+    @computed_field
+    @property
+    def status(self) -> LawStatus:
+        if self.closure_status is not None:
+            return self.closure_status
+        if self.is_promulgated:
+            return LawStatus.ADOPTED
+        return LawStatus.IN_PROGRESS
 
     @computed_field
     @property
     def current_stage(self) -> LegislativeStage | None:
-        """
-        The most recent stage that has been reached (date is not None).
-        """
         reached = [s for s in self.stages if s.updated_stage_date is not None]
         return reached[-1] if reached else None
 
     @computed_field
     @property
     def is_promulgated(self) -> bool:
-        """
-        True if the law has reached the PROM (promulgation) stage.
-        """
-        return any(s.code == "PROM" and s.updated_stage_date is not None for s in self.stages)
-
-    class Config:
-        from_attributes = True
+        return any(
+            s.code == "PROM" and s.updated_stage_date is not None
+            for s in self.stages
+        )

@@ -11,7 +11,7 @@ XML path: compteRendu/interventions/intervention
     order_in_debate  → intervention/ordre
 """
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from src.domain.shared.validators import NotBlankStr
 
 
@@ -23,12 +23,14 @@ class SpeakerType(str, Enum):
 
 
 class Intervention(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
     uid: str | None = None
     deputy_uid: str | None = None
-    speaker_name: NotBlankStr
+    speaker_name: str | None = None
     speaker_type: SpeakerType = SpeakerType.OTHER
-    content: NotBlankStr
-    order_in_debate: int
-
-    class Config:
-        from_attributes = True
+    content: str | None = None
+    order_in_debate: int | None = None
