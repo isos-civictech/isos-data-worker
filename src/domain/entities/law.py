@@ -21,13 +21,15 @@ JSON field mapping (root key: dossierParlementaire):
         if null or organe only             → government bill
 
 """
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, computed_field
+
 from src.domain.entities.legislative_stage import LegislativeStage
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
-class LawType(str, Enum):
+class LawType(StrEnum):
     """
     procedureParlementaire/code values from real DLR files.
     ⚠️ Complete this enum as more codes are discovered.
@@ -38,7 +40,7 @@ class LawType(str, Enum):
     OTHER = "0"                  # fallback for unknown codes
 
 
-class LawStatus(str, Enum):
+class LawStatus(StrEnum):
     IN_PROGRESS = "en cours d'examen"
     ADOPTED = "adopté"
     REJECTED = "rejeté"

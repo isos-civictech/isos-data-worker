@@ -27,12 +27,15 @@ Lifecycle:
 
 S3 path: raw/agenda/{legislature}/{year}/{month}/Agenda.xml.zip (full ZIP)
 """
-from datetime import datetime, timezone
-from enum import Enum
-from pydantic import BaseModel, Field, computed_field, ConfigDict
+from datetime import UTC, datetime
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
 from src.domain.shared.validators import Legislature, NotBlankStr
 
-class SessionStatus(str, Enum):
+
+class SessionStatus(StrEnum):
     SCHEDULED = "prévue"
     ONGOING = "en cours"
     COMPLETED = "terminée"
@@ -60,11 +63,11 @@ class AgendaItem(BaseModel):
     def status(self) -> SessionStatus:
         if self.cancelled:
             return SessionStatus.CANCELLED
-        now = datetime.now(tz=timezone.utc)
-        start = self.start_date if self.start_date.tzinfo else self.start_date.replace(tzinfo=timezone.utc)
+        now = datetime.now(tz=UTC)
+        start = self.start_date if self.start_date.tzinfo else self.start_date.replace(tzinfo=UTC)
         end = None
         if self.end_date:
-            end = self.end_date if self.end_date.tzinfo else self.end_date.replace(tzinfo=timezone.utc)
+            end = self.end_date if self.end_date.tzinfo else self.end_date.replace(tzinfo=UTC)
         if now < start:
             return SessionStatus.SCHEDULED
         if end and now > end:

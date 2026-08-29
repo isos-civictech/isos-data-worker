@@ -10,12 +10,12 @@ XML path: compteRendu/interventions/intervention
     content          → intervention/texte
     order_in_debate  → intervention/ordre
 """
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
-from src.domain.shared.validators import NotBlankStr
 
 
-class SpeakerType(str, Enum):
+class SpeakerType(StrEnum):
     DEPUTY = "deputy"
     MINISTER = "minister"
     PRESIDENT = "president"

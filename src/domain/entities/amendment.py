@@ -20,18 +20,20 @@ XML field mapping:
 S3 path: raw/amendments/{legislature}/{texte_uid}/{uid}.xml
 """
 
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
+
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
-class AmendmentAuthorType(str, Enum):
+class AmendmentAuthorType(StrEnum):
     DEPUTY = "Député"
     GROUP = "Groupe"
     GOVERNMENT = "Gouvernement"
     COMMISSION = "Commission"
 
-class AmendmentSort(str, Enum):
+class AmendmentSort(StrEnum):
     ADOPTED = "Adopté"
     REJECTED = "Rejeté"
     WITHDRAWN = "Retiré"
