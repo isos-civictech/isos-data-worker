@@ -2,8 +2,8 @@
 Reusable Pydantic validators shared across all domain entities.
 """
 from typing import Annotated
-from pydantic import BeforeValidator
-from pydantic import Field
+
+from pydantic import BeforeValidator, Field
 
 
 def _not_blank(value: str) -> str:
