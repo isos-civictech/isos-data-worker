@@ -1,32 +1,34 @@
-[tool.setuptools.packages.find]
-where = ["src"] 
-
 [project]
 name = "isos-data-worker"
 version = "0.1.0"
-description = "Add your description here"
+description = "Collecte des données ouvertes de l'Assemblée nationale (schéma raw) et projection vers le schéma d'affichage."
 readme = "README.md"
 authors = [
     { name = "Bervin Joey", email = "bervin_j@etna-alternance.net" },
-    { name = "Huber Vincent", email = "bervin_j@etna-alternance.net" },
-    { name = "Diard Benjamin", email = "bervin_j@etna-alternance.net" },
-    { name = "Rotaru Iulian", email = "bervin_j@etna-alternance.net" },
-    { name = "Miri Rabab", email = "bervin_j@etna-alternance.net" },
+    { name = "Huber Vincent", email = "huver_v@etna-alternance.net" },
+    { name = "Diard Benjamin", email = "diard_b@etna-alternance.net" },
+    { name = "Rotaru Iulian", email = "rotaru_i@etna-alternance.net" },
+    { name = "Miri Rabab", email = "miri_r@etna-alternance.net" },
     { name = "... Zora", email = "bervin_j@etna-alternance.net" },
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.14",
+    "asyncpg>=0.30",
     "boto3>=1.43.63",
+    "fastapi>=0.115",
     "httpx[http2]>=0.28.1",
     "loguru>=0.7.3",
     "lxml>=6.1.1",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
+    "sqlalchemy[asyncio]>=2.0",
     "tenacity>=9.1.4",
+    "uvicorn[standard]>=0.32",
 ]
 
-[project.scripts]
-isos-data-worker = "isos_data_worker:main"
+[tool.uv]
+package = false
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13.0"]
@@ -39,3 +41,18 @@ dev = [
     "respx>=0.23.1",
     "ruff>=0.16.1",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

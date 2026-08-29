@@ -19,18 +19,21 @@ XML field mapping:
     session_number → compteRendu/numSeance
     session_type   → compteRendu/typeSeance
     date           → compteRendu/dateSeance
-    points         → compteRendu/pointsOrdreJour/point[].  ---   each point links to interventions via pointODJRef
+    points         → compteRendu/pointsOrdreJour/point[]
+                     each point links to its interventions via pointODJRef
 
 S3 path: raw/debates/{legislature}/{year}/{month}/{uid}.xml
 """
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import datetime
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, computed_field
+
 from src.domain.entities.debate_point import DebatePoint
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
-class SessionType(str, Enum):
+class SessionType(StrEnum):
     PUBLIC_SESSION = "seance_publique"
     COMMITTEE = "commission"
     OTHER = "other"

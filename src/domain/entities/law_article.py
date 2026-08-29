@@ -7,11 +7,14 @@ Source: HTML pages (NOT in ZIP files)
 S3 path: raw/law_articles/{legislature}/{texte_uid}/{article_ref}_{version}.html
 """
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
+
 from src.domain.shared.validators import Legislature, NotBlankStr
 
-class ArticleVersion(str, Enum):
+
+class ArticleVersion(StrEnum):
     ORIGINAL = "original"
     PRE_AMENDMENT = "pre_amendment"
     POST_AMENDMENT = "post_amendment"

@@ -1,7 +1,10 @@
 from datetime import date
+
+from pydantic import BaseModel, ConfigDict, HttpUrl
+
 from src.domain.entities.mandate import Mandate
 from src.domain.shared.validators import NotBlankStr
-from pydantic import BaseModel, ConfigDict, HttpUrl
+
 
 class Deputy(BaseModel):
     """
@@ -20,7 +23,8 @@ class Deputy(BaseModel):
         last_name            → acteur/etatCivil/ident/nom
         birth_date           → acteur/etatCivil/ident/dateNais
         gender               → acteur/etatCivil/ident/sexe
-        photo_url            → https://www.nosdeputes.fr/depute/photo/{slug}/150.   slug = slug = f"{first_name}-{last_name}".lower().replace(" ", "-")
+        photo_url            → https://www.nosdeputes.fr/depute/photo/{slug}/150
+                               slug = f"{first_name}-{last_name}".lower().replace(" ", "-")
     """
     model_config = ConfigDict(
         populate_by_name=True,

@@ -23,15 +23,18 @@ JSON field mapping:
     votes            → scrutin/ventilationVotes/organe[]/groupe[]/vote[]
 """
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from src.domain.shared.validators import Legislature, NotBlankStr
 
-class VoteResult(str, Enum):
+
+class VoteResult(StrEnum):
     ADOPTED = "adopté"
-    REJECTED = "aejeté"
+    REJECTED = "rejeté"
     
-class VotePosition(str, Enum):
+class VotePosition(StrEnum):
     IN_FAVOR  = "pour"
     AGAINST   = "contre"
     ABSTENTION = "abstention"

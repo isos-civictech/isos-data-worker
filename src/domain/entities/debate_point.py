@@ -11,8 +11,8 @@ XML path: compteRendu/pointsOrdreJour/point
 
 """
 from pydantic import BaseModel, ConfigDict
+
 from src.domain.entities.intervention import Intervention
-from src.domain.shared.validators import NotBlankStr
 
 
 class DebatePoint(BaseModel):
