@@ -32,11 +32,14 @@
             <typeOrgane>ASSEMBLEE</typeOrgane>
             <dateDebut>2024-07-07</dateDebut>
             <dateFin/>
-            <preseance>219</preseance>
+            <preseance>50</preseance>
+            <mandature>
+                <placeHemicycle>219</placeHemicycle>
+            </mandature>
             <election>
                 <lieu>
-                    <numDep>13</numDep>
-                    <nomDep>Bouches-du-Rhône</nomDep>
+                    <numDepartement>13</numDepartement>
+                    <departement>Bouches-du-Rhône</departement>
                     <numCirco>4</numCirco>
                 </lieu>
             </election>
