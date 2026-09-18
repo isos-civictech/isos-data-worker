@@ -1,19 +1,75 @@
+# Postgres is NOT declared here on purpose.
+#
+# The worker writes into the same database as isos-api, with the least-privilege
+# role `isos_ingestion` created by isos-api/docker/postgres/initdb. A second,
+# bare Postgres would have neither those roles, nor the `public` content tables
+# the projection writes to — it would test against a database that does not
+# resemble production.
+#
+#   cd ../isos-api && docker compose up -d db
+#
+# Both stacks share the external `isos-network`, so the host name is `db`.
+
 services:
+  garage:
+    image: dxflrs/garage:v1.0.1
+    container_name: isos-garage
+    restart: unless-stopped
+    volumes:
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    ports:
+      - "3900:3900"          # S3 API
+      - "3903:3903"          # admin
+    networks:
+      - isos-network
+
+  # One-shot: a fresh Garage node has no storage layout, no key and no bucket,
+  # and none of them can be baked into the image because the node id only exists
+  # once the daemon runs. Runs, does the four steps, exits. Idempotent.
+  #
+  #   docker compose run --rm garage-bootstrap
+  garage-bootstrap:
+    image: dxflrs/garage:v1.0.1
+    container_name: isos-garage-bootstrap
+    depends_on:
+      - garage
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_RAW: ${S3_BUCKET_RAW:-isos-raw}
+      GARAGE_RPC_HOST: garage:3901
+    volumes:
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
+      - ./docker/garage/bootstrap.sh:/bootstrap.sh:ro
+    restart: "no"
+    networks:
+      - isos-network
+
   scraper:
     container_name: isos-scraper
     build:
-      context: .              
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env    
+      - .env
+    ports:
+      - "8001:8001"
     volumes:
       - ./src:/app/src
+      - ./migrations:/app/migrations
     depends_on:
-      db:
-        condition: service_healthy
+      garage:
+        condition: service_started
     networks:
       - isos-network
+
+volumes:
+  garage-meta:
+  garage-data:
 
 networks:
   isos-network:

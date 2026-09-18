@@ -1,9 +1,6 @@
 """
-Object storage adapter (Garage, MinIO, or any S3-compatible backend).
-
-boto3 is SYNCHRONOUS. Calling it directly from an async use case would block the
-event loop for the whole upload — including the /health route. Every call
-therefore goes through `asyncio.to_thread`.
+S3-compatible storage (Garage, MinIO…). boto3 is synchronous, so every call
+goes through `asyncio.to_thread`.
 """
 import asyncio
 
