@@ -29,6 +29,24 @@ services:
       - isos-network
 
 
+  # Web UI for Garage — http://localhost:3909 (buckets, keys, nodes, layout).
+  garage-webui:
+    image: khairul169/garage-webui:latest
+    container_name: isos-garage-webui
+    restart: unless-stopped
+    depends_on:
+      - garage
+    environment:
+      CONFIG_PATH: /etc/garage/garage.toml
+      API_BASE_URL: http://garage:3903
+      S3_ENDPOINT_URL: http://garage:3900
+    volumes:
+      - ./docker/garage:/etc/garage:ro
+    ports:
+      - "3909:3909"
+    networks:
+      - isos-network
+
   scraper:
     container_name: isos-scraper
     build:
