@@ -49,6 +49,11 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# B008 forbids function calls in argument defaults. For FastAPI that rule is
+# wrong: Depends() and Query() in a default IS the framework's own idiom.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
