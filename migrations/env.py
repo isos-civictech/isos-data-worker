@@ -9,7 +9,7 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -63,6 +63,19 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    # Alembic writes raw.alembic_version before any migration runs, so the
+    # schema has to exist first. isos-api's initdb creates it with
+    # isos_ingestion as owner; the CREATE below only covers a bare database.
+    # Checked first: even with IF NOT EXISTS, CREATE SCHEMA needs CREATE on the
+    # database, which the ingestion role does not have.
+    exists = connection.execute(
+        text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": SCHEMA}
+    ).scalar()
+    if not exists:
+        connection.execute(text(f"CREATE SCHEMA {SCHEMA}"))
+    # SQLAlchemy 2.0 auto-begins on the first execute; hand Alembic a clean
+    # connection or its own commit is never reached.
+    connection.commit()
     _configure(connection)
     with context.begin_transaction():
         context.run_migrations()

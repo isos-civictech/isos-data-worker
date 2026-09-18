@@ -39,8 +39,9 @@ def _seen_columns() -> list[sa.Column]:
 
 
 def upgrade() -> None:
-    op.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
-
+    # The schema itself is created by isos-api's initdb (or by env.py on a bare
+    # database) — never here: CREATE SCHEMA needs a privilege the ingestion role
+    # does not have.
     # ── audit ────────────────────────────────────────────────────────────────
     op.create_table(
         "ingestion_run",
