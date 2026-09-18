@@ -1,15 +1,5 @@
 """
-Port : écrire les députés dans le schéma `raw`.
-
-C'est un DÉPÔT : il persiste, chez nous. La différence avec `sources/` n'est pas
-cosmétique — une source peut échouer, être lente, changer de format sans
-prévenir ; un dépôt écrit dans un schéma dont nous sommes propriétaires.
-
-Ce que ce port promet, et qui vaut d'être connu du domaine :
-  - l'écriture est IDEMPOTENTE (upsert sur l'uid AN) ;
-  - elle ne supprime jamais rien ;
-  - un député et ses mandats forment une seule unité — le cas d'usage ouvre une
-    transaction par député, donc `save` ne doit pas en ouvrir une autre.
+Port: write deputies into the `raw` schema.
 """
 from abc import ABC, abstractmethod
 
@@ -20,20 +10,19 @@ from src.domain.shared.results import SaveOutcome
 
 class DeputyRepository(ABC):
     @abstractmethod
-    async def save(self, deputy: Deputy) -> SaveOutcome:
-        """
-        Insère ou met à jour un député et tous ses mandats.
-
-        `SaveOutcome.created` vaut faux si la ligne existait déjà : c'est ce qui
-        permet au compte-rendu de distinguer une première collecte d'un
-        deuxième run, et donc de vérifier l'idempotence.
-        """
+    async def save(
+        self,
+        deputy: Deputy,
+        *,
+        legislature: int,
+        run_id: int,
+        source_url: str | None = None,
+        checksum: str | None = None,
+    ) -> SaveOutcome:
+        """Atomic, idempotent upsert of a deputy, its mandates and its audit line."""
         ...
 
     @abstractmethod
-    async def save_political_groups(
-        self,
-        groups: list[PoliticalGroupRef],
-    ) -> int:
-        """Insère ou met à jour les groupes politiques. Renvoie le nombre traité."""
+    async def save_political_groups(self, groups: list[PoliticalGroupRef]) -> int:
+        """Upsert groups; must run before any deputy."""
         ...
