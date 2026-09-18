@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Edge case that WOULD have crashed the run before J1: a deputy elected by
+     "Français établis hors de France" has no department and no constituency.
+     Those Mandate fields were NotBlankStr and raised a ValidationError. -->
+<acteur xmlns="http://schemas.assemblee-nationale.fr/referentiel">
+    <uid>PA9999</uid>
+    <etatCivil>
+        <ident>
+            <civ>Mme</civ>
+            <prenom>Amélia</prenom>
+            <nom>Dupont-Étranger</nom>
+        </ident>
+        <infoNaissance>
+            <dateNais>1980-03-02</dateNais>
+        </infoNaissance>
+    </etatCivil>
+    <mandats>
+        <mandat>
+            <uid>PM9999001</uid>
+            <legislature>17</legislature>
+            <typeOrgane>ASSEMBLEE</typeOrgane>
+            <dateDebut>2024-07-07</dateDebut>
+            <dateFin/>
+            <election>
+                <lieu/>
+            </election>
+        </mandat>
+    </mandats>
+</acteur>

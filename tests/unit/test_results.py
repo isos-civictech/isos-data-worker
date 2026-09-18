@@ -12,13 +12,13 @@ def test_a_few_failures_are_tolerated():
 
 
 def test_too_many_failures_raise_the_alarm():
-    """Au-delà de 20 % d'échecs, la source a probablement changé de format."""
+    """Past 20% failures the source has probably changed format."""
     report = SyncReport(entity="deputy", processed=100, created=70, failed=30)
     assert report.ok is False
 
 
 def test_processing_nothing_is_not_a_success():
-    """Un run vide est un symptôme, pas un succès : il doit sortir en échec."""
+    """An empty run is a symptom, not a success."""
     assert SyncReport(entity="deputy").ok is False
 
 
