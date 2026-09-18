@@ -16,13 +16,16 @@ class DeputyRepository(ABC):
         *,
         legislature: int,
         run_id: int,
-        source_url: str | None = None,
-        checksum: str | None = None,
+        s3_key: str | None = None,
     ) -> SaveOutcome:
-        """Atomic, idempotent upsert of a deputy, its mandates and its audit line."""
+        """Atomic, idempotent upsert of a deputy and its mandates.
+
+        `updated_at` only moves when the content actually changed."""
         ...
 
     @abstractmethod
-    async def save_political_groups(self, groups: list[PoliticalGroupRef]) -> int:
+    async def save_political_groups(
+        self, groups: list[PoliticalGroupRef], *, run_id: int, s3_key: str | None = None
+    ) -> int:
         """Upsert groups; must run before any deputy."""
         ...

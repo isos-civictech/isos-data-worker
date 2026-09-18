@@ -18,7 +18,6 @@ from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.validators import Legislature
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
-from src.infrastructure.persistence.checksum import sha256_bytes
 
 ARCHIVE_PATH = (
     "/static/openData/repository/{legislature}/amo/"
@@ -26,6 +25,8 @@ ARCHIVE_PATH = (
     "AMO10_deputes_actifs_mandats_actifs_organes.xml.zip"
 )
 GROUP_CODE_TYPE = "GP"
+# Official portraits, not in the archive but derivable from the uid.
+PHOTO_URL = "https://www2.assemblee-nationale.fr/static/tribun/{legislature}/photos/{number}.jpg"
 
 
 def _text(node, path: str) -> str | None:
@@ -50,13 +51,18 @@ def _is_active(mandat) -> bool:
     return _text(mandat, "dateFin") is None
 
 
+def _gender(civ: str | None) -> str | None:
+    # "M." / "Mme" — both start with M, so no slicing.
+    return {"M.": "M", "Mme": "F"}.get(civ or "")
+
+
 class AnDeputyAdapter(DeputySource):
     def __init__(self, http: HttpClient, storage: RawStoragePort, base_url: str) -> None:
         self._http = http
         self._storage = storage
         self._base_url = base_url.rstrip("/")
         self._cache: dict[int, bytes] = {}
-        self.last_checksum: str | None = None
+        self.last_s3_key: str | None = None
 
     def archive_url(self, legislature: int) -> str:
         return self._base_url + ARCHIVE_PATH.format(legislature=legislature)
@@ -65,8 +71,7 @@ class AnDeputyAdapter(DeputySource):
         # Downloaded once, reused for the groups pass and the deputies pass.
         if legislature not in self._cache:
             payload = await self._http.get_bytes(self.archive_url(legislature))
-            self.last_checksum = sha256_bytes(payload)
-            await self._storage.put(
+            self.last_s3_key = await self._storage.put(
                 f"raw/deputies/{legislature}/AMO10.xml.zip",
                 payload,
                 content_type="application/zip",
@@ -78,7 +83,7 @@ class AnDeputyAdapter(DeputySource):
         payload = await self._archive(legislature)
         groups = (
             self._parse_organe(content)
-            for _, content in iter_zip_members(payload, prefix="organe/", suffix=".xml")
+            for _, content in iter_zip_members(payload, prefix="xml/organe/", suffix=".xml")
         )
         return [g for g in groups if g is not None]
 
@@ -87,14 +92,14 @@ class AnDeputyAdapter(DeputySource):
         deputies = (
             self._parse_acteur(content, legislature)
             for _, content in iter_zip_members(
-                payload, prefix="acteur/", suffix=".xml", limit=limit
+                payload, prefix="xml/acteur/", suffix=".xml", limit=limit
             )
         )
         return [d for d in deputies if d is not None]
 
     async def fetch_by_uid(self, uid: str, legislature: Legislature) -> Deputy | None:
         payload = await self._archive(legislature)
-        for name, content in iter_zip_members(payload, prefix=f"acteur/{uid}"):
+        for name, content in iter_zip_members(payload, prefix=f"xml/acteur/{uid}"):
             if name.endswith(f"{uid}.xml"):
                 return self._parse_acteur(content, legislature)
         return None
@@ -127,7 +132,6 @@ class AnDeputyAdapter(DeputySource):
         if not uid or not first_name or not last_name:
             return None
 
-        civ = _text(civil, "civ")
         mandate = cls._build_mandate(root, uid, legislature)
 
         return Deputy(
@@ -135,9 +139,9 @@ class AnDeputyAdapter(DeputySource):
             first_name=first_name,
             last_name=last_name,
             birth_date=_text(root, "etatCivil/infoNaissance/dateNais"),
-            gender=civ[:1] if civ else None,
+            gender=_gender(_text(civil, "civ")),
             profession=_text(root, "profession/libelleCourant"),
-            photo_url=None,
+            photo_url=PHOTO_URL.format(legislature=legislature, number=uid.removeprefix("PA")),
             mandates=[mandate] if mandate else [],
         )
 
@@ -167,7 +171,7 @@ class AnDeputyAdapter(DeputySource):
             mandate_end=_text(seat, "dateFin"),
             group_uid=_text(group, "organes/organeRef"),
             constituency_number=_int(place, "numCirco"),
-            department_name=_text(place, "nomDep"),
-            department_number=_text(place, "numDep"),
-            seat_number=_int(seat, "preseance"),
+            department_name=_text(place, "departement"),
+            department_number=_text(place, "numDepartement"),
+            seat_number=_int(seat, "mandature/placeHemicycle"),
         )

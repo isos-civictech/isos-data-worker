@@ -6,6 +6,7 @@ Revision ID: a6b93df75ec7
 Revises:
 Create Date: 2026-08-24
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -39,8 +40,9 @@ def _seen_columns() -> list[sa.Column]:
 
 
 def upgrade() -> None:
-    op.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA}")
-
+    # The schema itself is created by isos-api's initdb (or by env.py on a bare
+    # database) — never here: CREATE SCHEMA needs a privilege the ingestion role
+    # does not have.
     # ── audit ────────────────────────────────────────────────────────────────
     op.create_table(
         "ingestion_run",
@@ -240,9 +242,7 @@ def upgrade() -> None:
         sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
         schema=SCHEMA,
     )
-    op.create_index(
-        "ix_raw_debate_point_debate", "debate_point", ["debate_uid"], schema=SCHEMA
-    )
+    op.create_index("ix_raw_debate_point_debate", "debate_point", ["debate_uid"], schema=SCHEMA)
 
     op.create_table(
         "intervention",
@@ -261,9 +261,7 @@ def upgrade() -> None:
         sa.Column("order_in_debate", sa.Integer),
         schema=SCHEMA,
     )
-    op.create_index(
-        "ix_raw_intervention_point", "intervention", ["debate_point_id"], schema=SCHEMA
-    )
+    op.create_index("ix_raw_intervention_point", "intervention", ["debate_point_id"], schema=SCHEMA)
 
 
 def downgrade() -> None:

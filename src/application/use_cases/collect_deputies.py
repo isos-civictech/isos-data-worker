@@ -42,12 +42,12 @@ class CollectDeputies:
         )
 
         groups = await self._source.fetch_political_groups(legislature)
+        s3_key = getattr(self._source, "last_s3_key", None)
         if not self._dry_run:
-            await self._repository.save_political_groups(groups)
+            await self._repository.save_political_groups(groups, run_id=run_id, s3_key=s3_key)
         logger.info("collect.groups count={}", len(groups))
 
         deputies = await self._source.fetch_all(legislature, limit=limit)
-        checksum = getattr(self._source, "last_checksum", None)
 
         for deputy in deputies:
             report.processed += 1
@@ -58,11 +58,7 @@ class CollectDeputies:
 
             try:
                 outcome = await self._repository.save(
-                    deputy,
-                    legislature=legislature,
-                    run_id=run_id,
-                    source_url=source_url,
-                    checksum=checksum,
+                    deputy, legislature=legislature, run_id=run_id, s3_key=s3_key
                 )
             except Exception:
                 report.record_failure(deputy.uid)

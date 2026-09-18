@@ -29,10 +29,10 @@ class InMemoryStorage(RawStoragePort):
 def _archive() -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("acteur/PA1592.xml", (FIXTURES / "acteur_PA1592.xml").read_bytes())
-        archive.writestr("acteur/PA9999.xml", (FIXTURES / "acteur_PA9999.xml").read_bytes())
-        archive.writestr("organe/PO845401.xml", (FIXTURES / "organe_PO845401.xml").read_bytes())
-        archive.writestr("organe/PO420120.xml", (FIXTURES / "organe_PO420120.xml").read_bytes())
+        archive.writestr("xml/acteur/PA1592.xml", (FIXTURES / "acteur_PA1592.xml").read_bytes())
+        archive.writestr("xml/acteur/PA9999.xml", (FIXTURES / "acteur_PA9999.xml").read_bytes())
+        archive.writestr("xml/organe/PO845401.xml", (FIXTURES / "organe_PO845401.xml").read_bytes())
+        archive.writestr("xml/organe/PO420120.xml", (FIXTURES / "organe_PO420120.xml").read_bytes())
     return buffer.getvalue()
 
 
@@ -55,6 +55,7 @@ def test_namespace_does_not_swallow_every_field():
     assert deputy.first_name == "Jean-Luc"
     assert deputy.last_name == "Mélenchon"
     assert deputy.profession == "Professeur"
+    assert str(deputy.photo_url) == "https://www2.assemblee-nationale.fr/static/tribun/17/photos/1592.jpg"
 
 
 def test_seat_and_group_come_from_two_different_mandat_nodes():
@@ -88,6 +89,7 @@ def test_deputy_without_department_does_not_crash():
     )
 
     assert deputy is not None
+    assert deputy.gender == "F", '"Mme" must not be read as "M"'
     assert deputy.mandates[0].department_name is None
     assert deputy.mandates[0].constituency_number is None
 

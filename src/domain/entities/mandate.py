@@ -22,10 +22,10 @@ XML field mapping (inside acteur/PA{id}.xml):
     legislature          → mandat/legislature
     mandate_start        → mandat/dateDebut
     mandate_end          → mandat/dateFin  (empty = still active)
-    seat_number          → mandat/preseance
+    seat_number          → mandat/mandature/placeHemicycle   (not preseance: a protocol rank)
     constituency_number  → mandat/election/lieu/numCirco
-    department_name      → mandat/election/lieu/nomDep
-    department_number    → mandat/election/lieu/numDep
+    department_name      → mandat/election/lieu/departement
+    department_number    → mandat/election/lieu/numDepartement
 
     -- from the active GP mandat --
     group_uid            → mandat/organes/organeRef                  ("PO123456")

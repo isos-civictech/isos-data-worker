@@ -18,7 +18,7 @@ class FakeSource(DeputySource):
     def __init__(self, deputies, groups=None):
         self._deputies = deputies
         self._groups = groups or []
-        self.last_checksum = "abc123"
+        self.last_s3_key = "raw/deputies/17/AMO10.xml.zip"
 
     def archive_url(self, legislature: int) -> str:
         return f"https://example.test/{legislature}"
@@ -39,13 +39,13 @@ class FakeRepository(DeputyRepository):
         self.groups_saved = 0
         self._failing = failing_uids or set()
 
-    async def save(self, deputy, *, legislature, run_id, source_url=None, checksum=None):
+    async def save(self, deputy, *, legislature, run_id, s3_key=None):
         if deputy.uid in self._failing:
             raise ValueError(f"malformed record {deputy.uid}")
         self.saved.append(deputy.uid)
         return SaveOutcome(entity_id=len(self.saved), created=True)
 
-    async def save_political_groups(self, groups):
+    async def save_political_groups(self, groups, *, run_id, s3_key=None):
         self.groups_saved = len(groups)
         return len(groups)
 
@@ -54,7 +54,7 @@ class FakeLog(IngestionLogRepository):
     def __init__(self) -> None:
         self.finished: list[SyncReport] = []
 
-    async def start_run(self, entity_type, source_url=None) -> int:
+    async def start_run(self, entity_type, source_url=None, s3_key=None) -> int:
         return 1
 
     async def finish_run(self, run_id, report) -> None:

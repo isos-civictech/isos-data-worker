@@ -18,7 +18,7 @@ def political_group_row(group: PoliticalGroupRef) -> dict[str, Any]:
     }
 
 
-def deputy_row(deputy: Deputy, *, legislature: int, checksum: str | None = None) -> dict[str, Any]:
+def deputy_row(deputy: Deputy, *, legislature: int) -> dict[str, Any]:
     return {
         "uid": deputy.uid,
         "legislature": legislature,
@@ -29,7 +29,6 @@ def deputy_row(deputy: Deputy, *, legislature: int, checksum: str | None = None)
         "profession": deputy.profession,
         # HttpUrl is not a str for asyncpg.
         "photo_url": str(deputy.photo_url) if deputy.photo_url else None,
-        "checksum": checksum,
     }
 
 
@@ -41,8 +40,6 @@ def mandate_row(mandate: Mandate) -> dict[str, Any]:
         "mandate_start": mandate.mandate_start,
         "mandate_end": mandate.mandate_end,
         "group_uid": mandate.group_uid,
-        "group_acronym": mandate.group_acronym,
-        "group_name": mandate.group_name,
         "constituency_number": mandate.constituency_number,
         "department_name": mandate.department_name,
         "department_number": mandate.department_number,

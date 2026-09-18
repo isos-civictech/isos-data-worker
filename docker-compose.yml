@@ -15,8 +15,11 @@ services:
     image: dxflrs/garage:v1.0.1
     container_name: isos-garage
     restart: unless-stopped
+    # The config DIRECTORY is mounted, not the file: on Docker Desktop a
+    # single-file bind mount breaks as soon as an editor saves it (new inode).
+    command: ["/garage", "-c", "/etc/garage/garage.toml", "server"]
     volumes:
-      - ./docker/garage/garage.toml:/etc/garage.toml:ro
+      - ./docker/garage:/etc/garage:ro
       - garage-meta:/var/lib/garage/meta
       - garage-data:/var/lib/garage/data
     ports:
@@ -25,26 +28,22 @@ services:
     networks:
       - isos-network
 
-  # One-shot: a fresh Garage node has no storage layout, no key and no bucket,
-  # and none of them can be baked into the image because the node id only exists
-  # once the daemon runs. Runs, does the four steps, exits. Idempotent.
-  #
-  #   docker compose run --rm garage-bootstrap
-  garage-bootstrap:
-    image: dxflrs/garage:v1.0.1
-    container_name: isos-garage-bootstrap
+
+  # Web UI for Garage — http://localhost:3909 (buckets, keys, nodes, layout).
+  garage-webui:
+    image: khairul169/garage-webui:latest
+    container_name: isos-garage-webui
+    restart: unless-stopped
     depends_on:
       - garage
-    entrypoint: ["/bin/sh", "/bootstrap.sh"]
     environment:
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-      S3_SECRET_KEY: ${S3_SECRET_KEY}
-      S3_BUCKET_RAW: ${S3_BUCKET_RAW:-isos-raw}
-      GARAGE_RPC_HOST: garage:3901
+      CONFIG_PATH: /etc/garage/garage.toml
+      API_BASE_URL: http://garage:3903
+      S3_ENDPOINT_URL: http://garage:3900
     volumes:
-      - ./docker/garage/garage.toml:/etc/garage.toml:ro
-      - ./docker/garage/bootstrap.sh:/bootstrap.sh:ro
-    restart: "no"
+      - ./docker/garage:/etc/garage:ro
+    ports:
+      - "3909:3909"
     networks:
       - isos-network
 
@@ -56,6 +55,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # .env targets the host; inside compose the services are reachable by name.
+      DATABASE_URL: postgresql+asyncpg://isos_ingestion:${ISOS_INGESTION_DB_PASSWORD}@db:5432/${POSTGRES_DB:-isos_db}
+      S3_ENDPOINT: http://garage:3900
     ports:
       - "8001:8001"
     volumes:
