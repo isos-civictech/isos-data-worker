@@ -1,10 +1,5 @@
-# Postgres is NOT declared here on purpose.
-#
-# The worker writes into the same database as isos-api, with the least-privilege
-# role `isos_ingestion` created by isos-api/docker/postgres/initdb. A second,
-# bare Postgres would have neither those roles, nor the `public` content tables
-# the projection writes to — it would test against a database that does not
-# resemble production.
+# Postgres is NOT declared here: the worker writes into isos-api's database,
+# with the least-privilege role isos_ingestion created by its initdb scripts.
 #
 #   cd ../isos-api && docker compose up -d db
 #
@@ -12,7 +7,7 @@
 
 services:
   garage:
-    image: dxflrs/garage:v1.0.1
+    image: dxflrs/garage:v2.0.0
     container_name: isos-garage
     restart: unless-stopped
     # The config DIRECTORY is mounted, not the file: on Docker Desktop a
@@ -24,12 +19,14 @@ services:
       - garage-data:/var/lib/garage/data
     ports:
       - "3900:3900"          # S3 API
-      - "3903:3903"          # admin
+      - "3903:3903"          # admin API
     networks:
       - isos-network
 
+  # First start only:  ./docker/garage/bootstrap.sh
+  # (runs on the host — the garage image has no shell to run it inside)
 
-  # Web UI for Garage — http://localhost:3909 (buckets, keys, nodes, layout).
+  # Web UI — http://localhost:3909 : buckets, objects, keys, cluster.
   garage-webui:
     image: khairul169/garage-webui:latest
     container_name: isos-garage-webui
