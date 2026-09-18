@@ -1,8 +1,6 @@
 """
 LegislativeStage entity — one step in the parliamentary shuttle.
 
-⚠️ The actesLegislatifs structure in DLR files is a RECURSIVE TREE.
-
 Known stage codes (non-exhaustive list):
     SN1-DEPOT           → 1er dépôt d'une initiative (Sénat)
     SN1-COM             → Travaux des commissions (Sénat)
@@ -12,11 +10,8 @@ Known stage codes (non-exhaustive list):
     PROM                → Promulgation
 """
 from datetime import date
-
 from pydantic import BaseModel, ConfigDict
-
 from src.domain.shared.validators import NotBlankStr
-
 
 class LegislativeStage(BaseModel):
     model_config = ConfigDict(

@@ -20,7 +20,7 @@ XML field mapping:
     session_type   → compteRendu/typeSeance
     date           → compteRendu/dateSeance
     points         → compteRendu/pointsOrdreJour/point[]
-                     each point links to its interventions via pointODJRef
+                    each point links to its interventions via pointODJRef
 
 S3 path: raw/debates/{legislature}/{year}/{month}/{uid}.xml
 """

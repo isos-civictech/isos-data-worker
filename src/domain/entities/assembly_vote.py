@@ -9,9 +9,9 @@ JSON field mapping:
     uid              → scrutin/uid
     legislature      → scrutin/legislature
     vote_number      → scrutin/numero
-    debate_uid       → scrutin/seanceRef             ← links to Debate
-    amendment_uid    → scrutin/amendementRef          ← None = vote on full text
-    texte_uid        → scrutin/texteLegislatifRef     ← links to Law
+    debate_uid       → scrutin/seanceRef                    ← links to Debate
+    amendment_uid    → scrutin/amendementRef                ← None = vote on full text / links to Amendment if present
+    texte_uid        → scrutin/texteLegislatifRef           ← links to Law
     date             → scrutin/dateScrutin
     vote_type        → scrutin/typeVote/libelleTypevote
     title            → scrutin/titre
@@ -62,10 +62,7 @@ class NominalVoteCount(BaseModel):
 
 class RollCallVote(BaseModel):
     """Individual vote by one deputy on an assembly vote."""
-    model_config = ConfigDict(
-        populate_by_name=True,
-        from_attributes=True,
-    )
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     deputy_uid: NotBlankStr
     mandate_uid: str | None = None
