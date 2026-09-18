@@ -2,8 +2,13 @@
 `raw` schema — facts as published by the Assemblée nationale. Source of truth
 for the worker's Alembic.
 
-Conventions: BIGSERIAL id + AN uid as UNIQUE natural key; checksum /
-first_seen_at / last_seen_at on every root table; nothing is ever deleted.
+Conventions: BIGSERIAL id + AN uid as UNIQUE natural key; nothing is ever
+deleted. On every root table:
+    first_seen_at   first insert
+    last_seen_at    last run in which the AN export still contained it — a row
+                    that stops advancing means the entity left the export
+    updated_at      last time the content actually changed
+    last_run_id     the ingestion_run that last touched it
 Column names follow the source vocabulary; translation is the projection's job.
 """
 import sqlalchemy as sa
@@ -11,13 +16,27 @@ from sqlalchemy.dialects import postgresql as pg
 
 SCHEMA = "raw"
 
-metadata = sa.MetaData(schema=SCHEMA)
+# Every constraint gets a deterministic name, or Alembic cannot drop it later.
+metadata = sa.MetaData(
+    schema=SCHEMA,
+    naming_convention={
+        "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+        "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_name)s",
+        "pk": "pk_%(table_name)s",
+    },
+)
 
 
 def _seen_columns() -> list[sa.Column]:
     """Ingestion tracking, identical on every root table."""
     return [
-        sa.Column("checksum", sa.String(64)),
+        sa.Column("s3_key", sa.Text),
+        sa.Column(
+            "last_run_id",
+            sa.BigInteger,
+            sa.ForeignKey("raw.ingestion_run.id", ondelete="SET NULL"),
+        ),
         sa.Column(
             "first_seen_at",
             sa.DateTime(timezone=True),
@@ -26,6 +45,12 @@ def _seen_columns() -> list[sa.Column]:
         ),
         sa.Column(
             "last_seen_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.Column(
+            "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.func.now(),
@@ -42,6 +67,7 @@ ingestion_run = sa.Table(
     sa.Column("entity_type", sa.String(50), nullable=False),
     sa.Column("status", sa.String(20), nullable=False, server_default="running"),
     sa.Column("source_url", sa.Text),
+    sa.Column("s3_key", sa.Text),
     sa.Column("processed", sa.Integer, nullable=False, server_default="0"),
     sa.Column("created", sa.Integer, nullable=False, server_default="0"),
     sa.Column("updated", sa.Integer, nullable=False, server_default="0"),
@@ -53,27 +79,6 @@ ingestion_run = sa.Table(
     sa.Column("finished_at", sa.DateTime(timezone=True)),
 )
 
-# One row per entity actually ingested; unchanged entities write nothing.
-ingestion_log = sa.Table(
-    "ingestion_log",
-    metadata,
-    sa.Column("id", sa.BigInteger, primary_key=True),
-    sa.Column(
-        "run_id",
-        sa.BigInteger,
-        sa.ForeignKey("raw.ingestion_run.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    sa.Column("entity_type", sa.String(50), nullable=False),
-    sa.Column("entity_uid", sa.String(100), nullable=False),
-    sa.Column("source_url", sa.Text),
-    sa.Column("s3_key", sa.Text),
-    sa.Column("checksum", sa.String(64)),
-    sa.Column(
-        "fetched_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    ),
-    sa.Index("ix_raw_ingestion_log_entity", "entity_type", "entity_uid"),
-)
 
 
 # ── Referential ───────────────────────────────────────────────────────────────
@@ -102,7 +107,6 @@ deputy = sa.Table(
     sa.Column("gender", sa.String(1)),
     sa.Column("profession", sa.Text),
     sa.Column("photo_url", sa.Text),
-    sa.Column("s3_key", sa.Text),
     *_seen_columns(),
     sa.Index("ix_raw_deputy_legislature", "legislature"),
 )
@@ -122,9 +126,7 @@ mandate = sa.Table(
     sa.Column("mandate_start", sa.Date),
     sa.Column("mandate_end", sa.Date),
     # From the GP mandat (see mandate.py).
-    sa.Column("group_uid", sa.String(100)),
-    sa.Column("group_acronym", sa.String(50)),
-    sa.Column("group_name", sa.Text),
+    sa.Column("group_uid", sa.String(100)),  # name and acronym: join political_group
     sa.Column("constituency_number", sa.Integer),
     sa.Column("department_name", sa.Text),
     sa.Column("department_number", sa.String(10)),
@@ -148,7 +150,6 @@ law = sa.Table(
     sa.Column("law_type", sa.String(50)),
     sa.Column("initiateur_uid", sa.String(100)),
     sa.Column("closure_status", sa.String(50)),
-    sa.Column("s3_key", sa.Text),
     *_seen_columns(),
     sa.Index("ix_raw_law_texte_uid", "texte_uid"),
 )
@@ -212,7 +213,6 @@ debate = sa.Table(
     sa.Column("session_number", sa.Integer),
     sa.Column("session_type", sa.String(50)),
     sa.Column("date", sa.DateTime(timezone=True), nullable=False),
-    sa.Column("s3_key", sa.Text),
     *_seen_columns(),
 )
 

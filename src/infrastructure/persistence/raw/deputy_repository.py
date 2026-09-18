@@ -1,12 +1,12 @@
 """
-Deputy persistence in `raw`. One transaction per deputy: the deputy, its
-mandates and its audit line land together or not at all.
+Deputy persistence in `raw`. One transaction per deputy: the deputy and its
+mandates land together or not at all.
 """
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.domain.entities.deputy import Deputy
 from src.domain.entities.political_group import PoliticalGroupRef
@@ -20,20 +20,32 @@ from src.infrastructure.persistence.raw.mappers.deputy_mapper import (
     political_group_row,
 )
 
-ENTITY = "deputy"
+# Bookkeeping columns: never part of the "did the content change?" comparison.
+_TRACKING = {"first_seen_at", "last_seen_at", "updated_at", "last_run_id", "s3_key"}
 
 
-def _upsert(table: sa.Table, row: dict[str, Any], *, key: str, touch_seen: bool = True):
-    """Upsert on `key`; `(xmax = 0)` tells an insert from an update."""
+def _upsert(table: sa.Table, row: dict[str, Any], *, key: str, tracked: bool = True):
+    """
+    INSERT … ON CONFLICT (key) DO UPDATE.
+
+    `updated_at` only moves when a content column differs (IS DISTINCT FROM),
+    so a re-run leaves it untouched. `(xmax = 0)` tells an insert from an update.
+    """
     statement = insert(table).values(**row)
-    updates = {column: statement.excluded[column] for column in row if column != key}
-    if touch_seen:
-        updates["last_seen_at"] = sa.func.now()
+    excluded = statement.excluded
+    content = [c for c in row if c != key and c not in _TRACKING]
 
-    return statement.on_conflict_do_update(
-        index_elements=[key],
-        set_=updates,
-    ).returning(table.c.id, (sa.column("xmax") == 0).label("created"))
+    updates: dict[str, Any] = {c: excluded[c] for c in row if c != key}
+    if tracked:
+        changed = sa.tuple_(*(table.c[c] for c in content)).is_distinct_from(
+            sa.tuple_(*(excluded[c] for c in content))
+        )
+        updates["last_seen_at"] = sa.func.now()
+        updates["updated_at"] = sa.case((changed, sa.func.now()), else_=table.c.updated_at)
+
+    return statement.on_conflict_do_update(index_elements=[key], set_=updates).returning(
+        table.c.id, (sa.column("xmax") == 0).label("created")
+    )
 
 
 class SqlRawDeputyRepository(DeputyRepository):
@@ -46,55 +58,27 @@ class SqlRawDeputyRepository(DeputyRepository):
         *,
         legislature: int,
         run_id: int,
-        source_url: str | None = None,
-        checksum: str | None = None,
+        s3_key: str | None = None,
     ) -> SaveOutcome:
+        tracking = {"last_run_id": run_id, "s3_key": s3_key}
+        row = deputy_row(deputy, legislature=legislature) | tracking
         async with transaction(self._engine) as connection:
-            outcome = await self._save_deputy(
-                connection, deputy, legislature=legislature, checksum=checksum
-            )
-            # Same transaction as the deputy.
-            await connection.execute(
-                sa.insert(tables.ingestion_log).values(
-                    run_id=run_id,
-                    entity_type=ENTITY,
-                    entity_uid=deputy.uid,
-                    source_url=source_url,
-                    checksum=checksum,
+            deputy_id, created = (
+                await connection.execute(_upsert(tables.deputy, row, key="uid"))
+            ).one()
+            for mandate in deputy.mandates:
+                await connection.execute(
+                    _upsert(tables.mandate, mandate_row(mandate), key="uid", tracked=False)
                 )
-            )
-        return outcome
+        return SaveOutcome(entity_id=deputy_id, created=created)
 
-    async def save_political_groups(self, groups: list[PoliticalGroupRef]) -> int:
+    async def save_political_groups(
+        self, groups: list[PoliticalGroupRef], *, run_id: int, s3_key: str | None = None
+    ) -> int:
         if not groups:
             return 0
         async with transaction(self._engine) as connection:
             for group in groups:
-                await connection.execute(
-                    _upsert(tables.political_group, political_group_row(group), key="uid")
-                )
+                row = political_group_row(group) | {"last_run_id": run_id, "s3_key": s3_key}
+                await connection.execute(_upsert(tables.political_group, row, key="uid"))
         return len(groups)
-
-    async def _save_deputy(
-        self,
-        connection: AsyncConnection,
-        deputy: Deputy,
-        *,
-        legislature: int,
-        checksum: str | None,
-    ) -> SaveOutcome:
-        result = await connection.execute(
-            _upsert(
-                tables.deputy,
-                deputy_row(deputy, legislature=legislature, checksum=checksum),
-                key="uid",
-            )
-        )
-        deputy_id, created = result.one()
-
-        for mandate in deputy.mandates:
-            await connection.execute(
-                _upsert(tables.mandate, mandate_row(mandate), key="uid", touch_seen=False)
-            )
-
-        return SaveOutcome(entity_id=deputy_id, created=created)

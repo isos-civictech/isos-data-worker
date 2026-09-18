@@ -18,7 +18,6 @@ from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.validators import Legislature
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
-from src.infrastructure.persistence.checksum import sha256_bytes
 
 ARCHIVE_PATH = (
     "/static/openData/repository/{legislature}/amo/"
@@ -26,6 +25,8 @@ ARCHIVE_PATH = (
     "AMO10_deputes_actifs_mandats_actifs_organes.xml.zip"
 )
 GROUP_CODE_TYPE = "GP"
+# Official portraits, not in the archive but derivable from the uid.
+PHOTO_URL = "https://www2.assemblee-nationale.fr/static/tribun/{legislature}/photos/{number}.jpg"
 
 
 def _text(node, path: str) -> str | None:
@@ -61,7 +62,7 @@ class AnDeputyAdapter(DeputySource):
         self._storage = storage
         self._base_url = base_url.rstrip("/")
         self._cache: dict[int, bytes] = {}
-        self.last_checksum: str | None = None
+        self.last_s3_key: str | None = None
 
     def archive_url(self, legislature: int) -> str:
         return self._base_url + ARCHIVE_PATH.format(legislature=legislature)
@@ -70,8 +71,7 @@ class AnDeputyAdapter(DeputySource):
         # Downloaded once, reused for the groups pass and the deputies pass.
         if legislature not in self._cache:
             payload = await self._http.get_bytes(self.archive_url(legislature))
-            self.last_checksum = sha256_bytes(payload)
-            await self._storage.put(
+            self.last_s3_key = await self._storage.put(
                 f"raw/deputies/{legislature}/AMO10.xml.zip",
                 payload,
                 content_type="application/zip",
@@ -141,7 +141,7 @@ class AnDeputyAdapter(DeputySource):
             birth_date=_text(root, "etatCivil/infoNaissance/dateNais"),
             gender=_gender(_text(civil, "civ")),
             profession=_text(root, "profession/libelleCourant"),
-            photo_url=None,
+            photo_url=PHOTO_URL.format(legislature=legislature, number=uid.removeprefix("PA")),
             mandates=[mandate] if mandate else [],
         )
 

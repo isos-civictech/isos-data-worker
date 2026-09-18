@@ -55,6 +55,7 @@ def test_namespace_does_not_swallow_every_field():
     assert deputy.first_name == "Jean-Luc"
     assert deputy.last_name == "Mélenchon"
     assert deputy.profession == "Professeur"
+    assert str(deputy.photo_url) == "https://www2.assemblee-nationale.fr/static/tribun/17/photos/1592.jpg"
 
 
 def test_seat_and_group_come_from_two_different_mandat_nodes():
