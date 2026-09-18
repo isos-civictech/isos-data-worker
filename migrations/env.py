@@ -27,6 +27,14 @@ target_metadata = metadata
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 
+def include_name(name, type_, parent_names) -> bool:
+    """Reflect only the `raw` schema — before touching the others, which the
+    ingestion role cannot even read."""
+    if type_ == "schema":
+        return name == SCHEMA
+    return True
+
+
 def include_object(object_, name, type_, reflected, compare_to) -> bool:
     """Keep autogenerate strictly inside `raw`."""
     if type_ == "table":
@@ -42,6 +50,7 @@ def _configure(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_name=include_name,
         include_object=include_object,
         version_table_schema=SCHEMA,
         compare_type=True,
@@ -55,6 +64,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        include_name=include_name,
         include_object=include_object,
         version_table_schema=SCHEMA,
     )
