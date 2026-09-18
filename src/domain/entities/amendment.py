@@ -21,8 +21,11 @@ S3 path: raw/amendments/{legislature}/{texte_uid}/{uid}.xml
 """
 
 from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
+
 from src.domain.shared.validators import Legislature, NotBlankStr
+
 
 class AmendmentAuthorType(StrEnum):
     DEPUTY = "Député"

@@ -10,7 +10,7 @@ JSON field mapping:
     legislature      → scrutin/legislature
     vote_number      → scrutin/numero
     debate_uid       → scrutin/seanceRef                    ← links to Debate
-    amendment_uid    → scrutin/amendementRef                ← None = vote on full text / links to Amendment if present
+    amendment_uid    → scrutin/amendementRef                ← None = vote on full text
     texte_uid        → scrutin/texteLegislatifRef           ← links to Law
     date             → scrutin/dateScrutin
     vote_type        → scrutin/typeVote/libelleTypevote

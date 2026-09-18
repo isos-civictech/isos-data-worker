@@ -22,7 +22,9 @@ JSON field mapping (root key: dossierParlementaire):
 
 """
 from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, computed_field
+
 from src.domain.entities.legislative_stage import LegislativeStage
 from src.domain.shared.validators import Legislature, NotBlankStr
 

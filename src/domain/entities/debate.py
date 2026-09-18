@@ -1,13 +1,5 @@
 """
-Debate — one parliamentary session (an Episode in our Netflix metaphor).
-
-⚠️  AVERTISSEMENT SYCERON XML :
-    Le flux Syceron ne suit aucun schéma fixe.
-    Le nom du champ date peut être :
-    dateSeance | DateSeance | Date_Seance | date_seance
-
-A Debate is structured as ordered DebatePoints.
-Each DebatePoint discusses one Law and holds its own Interventions.
+Debate — one parliamentary sitting, made of ordered DebatePoints.
 
 Source: Syceron XML
     ZIP: https://data.assemblee-nationale.fr/static/openData/repository/{legislature}/vp/syceronbrut/syseron.xml.zip
@@ -18,7 +10,7 @@ XML field mapping:
     legislature    → compteRendu/legislature
     session_number → compteRendu/numSeance
     session_type   → compteRendu/typeSeance
-    date           → compteRendu/dateSeance
+    date           → compteRendu/dateSeance   (tag name varies: DateSeance, date_seance…)
     points         → compteRendu/pointsOrdreJour/point[]
                     each point links to its interventions via pointODJRef
 

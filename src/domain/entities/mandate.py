@@ -34,7 +34,9 @@ XML field mapping (inside acteur/PA{id}.xml):
 """
 
 from datetime import date
+
 from pydantic import BaseModel, ConfigDict, computed_field
+
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
@@ -53,6 +55,8 @@ class Mandate(BaseModel):
     legislature: Legislature
     mandate_start: date | None = None
     mandate_end: date | None = None
+
+    group_uid: str | None = None       # "PO845401", from the active GP mandat
     group_acronym: str | None = None
     group_name: str | None = None
 

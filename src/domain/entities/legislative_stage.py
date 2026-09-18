@@ -10,8 +10,11 @@ Known stage codes (non-exhaustive list):
     PROM                → Promulgation
 """
 from datetime import date
+
 from pydantic import BaseModel, ConfigDict
+
 from src.domain.shared.validators import NotBlankStr
+
 
 class LegislativeStage(BaseModel):
     model_config = ConfigDict(
