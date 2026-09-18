@@ -1,27 +1,10 @@
 """
-The `raw` schema — the facts, as the Assemblée nationale publishes them.
+`raw` schema — facts as published by the Assemblée nationale. Source of truth
+for the worker's Alembic.
 
-THIS FILE IS THE SOURCE OF TRUTH. The worker owns this schema
-(`CREATE SCHEMA raw AUTHORIZATION isos_ingestion`), and its Alembic autogenerate
-compares the database against this metadata. Change a column here, generate a
-revision, done — no coordination with another repository.
-
-Three conventions apply to every table:
-
-  1. `id BIGSERIAL` primary key, AN uid as a UNIQUE natural key. The surrogate
-     key is what lets a future view in `public` expose integer ids to the front
-     without a join.
-  2. `first_seen_at` / `last_seen_at` / `checksum` on every root table. The
-     checksum answers "did the AN republish the same thing?" without reading the
-     content; `last_seen_at` answers "is this entity still in the export?"
-     without ever deleting a row.
-  3. NOTHING IS EVER DELETED. No DELETE, no TRUNCATE, and the role has no DELETE
-     grant. An entity that vanishes from the export keeps its row, with a
-     `last_seen_at` that stops moving.
-
-Field names deliberately mirror the source vocabulary (`texte_uid`,
-`dossier_uid`, `sort`), even where the display schema uses different words.
-Translation is the projection's job, not the collector's.
+Conventions: BIGSERIAL id + AN uid as UNIQUE natural key; checksum /
+first_seen_at / last_seen_at on every root table; nothing is ever deleted.
+Column names follow the source vocabulary; translation is the projection's job.
 """
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
@@ -70,8 +53,7 @@ ingestion_run = sa.Table(
     sa.Column("finished_at", sa.DateTime(timezone=True)),
 )
 
-# One row per entity actually ingested. An unchanged entity writes NOTHING here:
-# a log full of "nothing changed" no longer answers the question it exists for.
+# One row per entity actually ingested; unchanged entities write nothing.
 ingestion_log = sa.Table(
     "ingestion_log",
     metadata,
@@ -116,8 +98,7 @@ deputy = sa.Table(
     sa.Column("first_name", sa.Text, nullable=False),
     sa.Column("last_name", sa.Text, nullable=False),
     sa.Column("birth_date", sa.Date),
-    # Kept even though the display schema has no column for them: raw records
-    # what was published, not what is currently shown.
+    # No column for these in the display schema; raw keeps them anyway.
     sa.Column("gender", sa.String(1)),
     sa.Column("profession", sa.Text),
     sa.Column("photo_url", sa.Text),
@@ -140,7 +121,7 @@ mandate = sa.Table(
     sa.Column("legislature", sa.Integer, nullable=False),
     sa.Column("mandate_start", sa.Date),
     sa.Column("mandate_end", sa.Date),
-    # From the GP mandat, not the ASSEMBLEE one — see mandate.py's docstring.
+    # From the GP mandat (see mandate.py).
     sa.Column("group_uid", sa.String(100)),
     sa.Column("group_acronym", sa.String(50)),
     sa.Column("group_name", sa.Text),
@@ -159,10 +140,10 @@ law = sa.Table(
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
     sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N47390"
-    # The join key debates need: a sitting references TEXTE uids, not dossier ones.
+    # Join key for debates, which reference texte uids.
     sa.Column("texte_uid", sa.String(100)),
     sa.Column("legislature", sa.Integer, nullable=False),
-    # Full title, never truncated. Shortening to 255 is the projection's problem.
+    # Never truncated here.
     sa.Column("title", sa.Text, nullable=False),
     sa.Column("law_type", sa.String(50)),
     sa.Column("initiateur_uid", sa.String(100)),
@@ -189,8 +170,7 @@ law_stage = sa.Table(
     sa.UniqueConstraint("dossier_uid", "code", "position", name="uq_raw_law_stage"),
 )
 
-# The one versioned table. A text that changes never overwrites the previous
-# version: the old row stays, marked is_current = false. See law_repository.
+# Versioned: a changed text inserts a new row, the old one gets is_current=false.
 law_article = sa.Table(
     "law_article",
     metadata,
@@ -209,8 +189,7 @@ law_article = sa.Table(
     sa.Column(
         "scraped_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     ),
-    # PARTIAL unique index: only one current version per article. It is also
-    # what forces the old row to be flipped to false BEFORE inserting the new one.
+    # One current version per article.
     sa.Index(
         "uq_raw_law_article_current",
         "texte_uid",
@@ -229,8 +208,7 @@ debate = sa.Table(
     sa.Column("id", sa.BigInteger, primary_key=True),
     sa.Column("uid", sa.String(100), nullable=False, unique=True),
     sa.Column("legislature", sa.Integer, nullable=False),
-    # Nullable here although the display schema requires it: raw stays faithful,
-    # the projection is responsible for finding a fallback.
+    # Nullable here; the projection provides a fallback.
     sa.Column("session_number", sa.Integer),
     sa.Column("session_type", sa.String(50)),
     sa.Column("date", sa.DateTime(timezone=True), nullable=False),
@@ -238,8 +216,7 @@ debate = sa.Table(
     *_seen_columns(),
 )
 
-# The "subject" level — this is what makes a per-topic summary possible, and it
-# had no table anywhere before the raw schema existed.
+# Agenda item ("point d'ordre du jour"): the per-topic level.
 debate_point = sa.Table(
     "debate_point",
     metadata,
@@ -253,8 +230,6 @@ debate_point = sa.Table(
     sa.Column("point_uid", sa.String(100)),
     sa.Column("title", sa.Text),
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
-    # A Postgres array, because that is what the source holds. Flattening is the
-    # projection's job.
     sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_debate_point_debate", "debate_uid"),
 )
