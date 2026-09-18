@@ -1,0 +1,76 @@
+# Postgres is NOT declared here: the worker writes into isos-api's database,
+# with the least-privilege role isos_ingestion created by its initdb scripts.
+#
+#   cd ../isos-api && docker compose up -d db
+#
+# Both stacks share the external `isos-network`, so the host name is `db`.
+
+services:
+  garage:
+    image: dxflrs/garage:v2.0.0
+    container_name: isos-garage
+    restart: unless-stopped
+    # The config DIRECTORY is mounted, not the file: on Docker Desktop a
+    # single-file bind mount breaks as soon as an editor saves it (new inode).
+    command: ["/garage", "-c", "/etc/garage/garage.toml", "server"]
+    volumes:
+      - ./docker/garage:/etc/garage:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    ports:
+      - "3900:3900"          # S3 API
+      - "3903:3903"          # admin API
+    networks:
+      - isos-network
+
+  # First start only:  ./docker/garage/bootstrap.sh
+  # (runs on the host — the garage image has no shell to run it inside)
+
+  # Web UI — http://localhost:3909 : buckets, objects, keys, cluster.
+  garage-webui:
+    image: khairul169/garage-webui:latest
+    container_name: isos-garage-webui
+    restart: unless-stopped
+    depends_on:
+      - garage
+    environment:
+      CONFIG_PATH: /etc/garage/garage.toml
+      API_BASE_URL: http://garage:3903
+      S3_ENDPOINT_URL: http://garage:3900
+    volumes:
+      - ./docker/garage:/etc/garage:ro
+    ports:
+      - "3909:3909"
+    networks:
+      - isos-network
+
+  scraper:
+    container_name: isos-scraper
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # .env targets the host; inside compose the services are reachable by name.
+      DATABASE_URL: postgresql+asyncpg://isos_ingestion:${ISOS_INGESTION_DB_PASSWORD}@db:5432/${POSTGRES_DB:-isos_db}
+      S3_ENDPOINT: http://garage:3900
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./src:/app/src
+      - ./migrations:/app/migrations
+    depends_on:
+      garage:
+        condition: service_started
+    networks:
+      - isos-network
+
+volumes:
+  garage-meta:
+  garage-data:
+
+networks:
+  isos-network:
+    external: true

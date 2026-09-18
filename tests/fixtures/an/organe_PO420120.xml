@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Not a political group: the same archive holds commissions, delegations and
+     friendship groups. Only codeType == "GP" must be kept. -->
+<organe xmlns="http://schemas.assemblee-nationale.fr/referentiel">
+    <uid>PO420120</uid>
+    <codeType>COMPER</codeType>
+    <libelle>Commission des affaires économiques</libelle>
+    <libelleAbrege>CION-ECO</libelleAbrege>
+    <legislature>17</legislature>
+</organe>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trimmed from a real AMO10 file. The default namespace is kept ON PURPOSE:
+     it is trap #1, and without it every findtext() returns None silently. -->
+<acteur xmlns="http://schemas.assemblee-nationale.fr/referentiel">
+    <uid xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="IdActeur">PA1592</uid>
+    <etatCivil>
+        <ident>
+            <civ>M.</civ>
+            <prenom>Jean-Luc</prenom>
+            <nom>Mélenchon</nom>
+        </ident>
+        <infoNaissance>
+            <dateNais>1951-08-19</dateNais>
+            <villeNais>Tanger</villeNais>
+        </infoNaissance>
+    </etatCivil>
+    <profession>
+        <libelleCourant>Professeur</libelleCourant>
+    </profession>
+    <mandats>
+        <!-- Ignored: not a seat, not a group. -->
+        <mandat xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MandatType">
+            <uid>PM1000</uid>
+            <typeOrgane>COMPER</typeOrgane>
+            <dateDebut>2024-07-18</dateDebut>
+            <organes><organeRef>PO420120</organeRef></organes>
+        </mandat>
+        <!-- The seat: uid, dates, geography, preseance all come from here. -->
+        <mandat xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MandatType">
+            <uid>PM1592001</uid>
+            <legislature>17</legislature>
+            <typeOrgane>ASSEMBLEE</typeOrgane>
+            <dateDebut>2024-07-07</dateDebut>
+            <dateFin/>
+            <preseance>50</preseance>
+            <mandature>
+                <placeHemicycle>219</placeHemicycle>
+            </mandature>
+            <election>
+                <lieu>
+                    <numDepartement>13</numDepartement>
+                    <departement>Bouches-du-Rhône</departement>
+                    <numCirco>4</numCirco>
+                </lieu>
+            </election>
+            <organes><organeRef>PO717460</organeRef></organes>
+        </mandat>
+        <!-- An OLD group affiliation: it has an end date, so it must be ignored. -->
+        <mandat xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MandatType">
+            <uid>PM1592002</uid>
+            <legislature>17</legislature>
+            <typeOrgane>GP</typeOrgane>
+            <dateDebut>2024-07-18</dateDebut>
+            <dateFin>2025-01-15</dateFin>
+            <organes><organeRef>PO000000</organeRef></organes>
+        </mandat>
+        <!-- The CURRENT group: no end date. This is the one to keep. -->
+        <mandat xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MandatType">
+            <uid>PM1592003</uid>
+            <legislature>17</legislature>
+            <typeOrgane>GP</typeOrgane>
+            <dateDebut>2025-01-16</dateDebut>
+            <dateFin/>
+            <organes><organeRef>PO845401</organeRef></organes>
+        </mandat>
+    </mandats>
+</acteur>

@@ -1,0 +1,68 @@
+"""
+Command line entry point (used by Kubernetes Jobs). Exit code 0 if the run is
+acceptable, 1 otherwise.
+"""
+import argparse
+import asyncio
+
+from loguru import logger
+
+from src.composition import build_collect_deputies, build_engine
+from src.config import get_settings
+from src.domain.shared.results import SyncReport
+from src.logging_setup import setup_logging
+
+
+async def _collect_deputies(args) -> SyncReport:
+    settings = get_settings()
+    engine = build_engine(settings)
+    try:
+        async with build_collect_deputies(
+            settings, engine, dry_run=args.dry_run
+        ) as use_case:
+            if args.uid:
+                return await use_case.execute_one(args.uid, args.legislature)
+            return await use_case.execute(args.legislature, limit=args.limit)
+    finally:
+        await engine.dispose()
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="isos-data-worker")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    collect = sub.add_parser(
+        "collect-deputies", help="Assemblée nationale → raw.deputy"
+    )
+    collect.add_argument("--legislature", type=int, default=None)
+    collect.add_argument(
+        "--limit", type=int, default=None, help="stop after N deputies (development)"
+    )
+    collect.add_argument("--uid", default=None, help="replay a single deputy")
+    collect.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="fetch and parse, write nothing",
+    )
+    collect.set_defaults(handler=_collect_deputies)
+
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
+    settings = get_settings()
+    setup_logging(settings.log_level)
+
+    if getattr(args, "legislature", None) is None:
+        args.legislature = settings.an_legislature
+
+    logger.info("target database={}", settings.safe_database_target)
+
+    report = asyncio.run(args.handler(args))
+    print(report.as_dict())
+    return 0 if report.ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

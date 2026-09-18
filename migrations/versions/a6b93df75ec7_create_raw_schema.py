@@ -1,0 +1,281 @@
+"""create raw schema
+
+Hand-written; mirrors src/infrastructure/persistence/raw/tables.py.
+
+Revision ID: a6b93df75ec7
+Revises:
+Create Date: 2026-08-24
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql as pg
+
+revision: str = "a6b93df75ec7"
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+SCHEMA = "raw"
+
+
+def _seen_columns() -> list[sa.Column]:
+    return [
+        sa.Column("checksum", sa.String(64)),
+        sa.Column(
+            "first_seen_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.Column(
+            "last_seen_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+    ]
+
+
+def upgrade() -> None:
+    # The schema itself is created by isos-api's initdb (or by env.py on a bare
+    # database) — never here: CREATE SCHEMA needs a privilege the ingestion role
+    # does not have.
+    # ── audit ────────────────────────────────────────────────────────────────
+    op.create_table(
+        "ingestion_run",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("entity_type", sa.String(50), nullable=False),
+        sa.Column("status", sa.String(20), nullable=False, server_default="running"),
+        sa.Column("source_url", sa.Text),
+        sa.Column("processed", sa.Integer, nullable=False, server_default="0"),
+        sa.Column("created", sa.Integer, nullable=False, server_default="0"),
+        sa.Column("updated", sa.Integer, nullable=False, server_default="0"),
+        sa.Column("skipped", sa.Integer, nullable=False, server_default="0"),
+        sa.Column("failed", sa.Integer, nullable=False, server_default="0"),
+        sa.Column(
+            "started_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.Column("finished_at", sa.DateTime(timezone=True)),
+        schema=SCHEMA,
+    )
+
+    op.create_table(
+        "ingestion_log",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column(
+            "run_id",
+            sa.BigInteger,
+            sa.ForeignKey(f"{SCHEMA}.ingestion_run.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("entity_type", sa.String(50), nullable=False),
+        sa.Column("entity_uid", sa.String(100), nullable=False),
+        sa.Column("source_url", sa.Text),
+        sa.Column("s3_key", sa.Text),
+        sa.Column("checksum", sa.String(64)),
+        sa.Column(
+            "fetched_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        schema=SCHEMA,
+    )
+    op.create_index(
+        "ix_raw_ingestion_log_entity",
+        "ingestion_log",
+        ["entity_type", "entity_uid"],
+        schema=SCHEMA,
+    )
+
+    # ── referential ──────────────────────────────────────────────────────────
+    op.create_table(
+        "political_group",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("uid", sa.String(100), nullable=False, unique=True),
+        sa.Column("legislature", sa.Integer),
+        sa.Column("name", sa.Text, nullable=False),
+        sa.Column("short_name", sa.String(50)),
+        *_seen_columns(),
+        schema=SCHEMA,
+    )
+
+    op.create_table(
+        "deputy",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("uid", sa.String(100), nullable=False, unique=True),
+        sa.Column("legislature", sa.Integer, nullable=False),
+        sa.Column("first_name", sa.Text, nullable=False),
+        sa.Column("last_name", sa.Text, nullable=False),
+        sa.Column("birth_date", sa.Date),
+        sa.Column("gender", sa.String(1)),
+        sa.Column("profession", sa.Text),
+        sa.Column("photo_url", sa.Text),
+        sa.Column("s3_key", sa.Text),
+        *_seen_columns(),
+        schema=SCHEMA,
+    )
+    op.create_index("ix_raw_deputy_legislature", "deputy", ["legislature"], schema=SCHEMA)
+
+    op.create_table(
+        "mandate",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("uid", sa.String(100), nullable=False, unique=True),
+        sa.Column(
+            "deputy_uid",
+            sa.String(100),
+            sa.ForeignKey(f"{SCHEMA}.deputy.uid", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("legislature", sa.Integer, nullable=False),
+        sa.Column("mandate_start", sa.Date),
+        sa.Column("mandate_end", sa.Date),
+        sa.Column("group_uid", sa.String(100)),
+        sa.Column("group_acronym", sa.String(50)),
+        sa.Column("group_name", sa.Text),
+        sa.Column("constituency_number", sa.Integer),
+        sa.Column("department_name", sa.Text),
+        sa.Column("department_number", sa.String(10)),
+        sa.Column("seat_number", sa.Integer),
+        schema=SCHEMA,
+    )
+    op.create_index("ix_raw_mandate_deputy", "mandate", ["deputy_uid"], schema=SCHEMA)
+
+    # ── laws ─────────────────────────────────────────────────────────────────
+    op.create_table(
+        "law",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),
+        sa.Column("texte_uid", sa.String(100)),
+        sa.Column("legislature", sa.Integer, nullable=False),
+        sa.Column("title", sa.Text, nullable=False),
+        sa.Column("law_type", sa.String(50)),
+        sa.Column("initiateur_uid", sa.String(100)),
+        sa.Column("closure_status", sa.String(50)),
+        sa.Column("s3_key", sa.Text),
+        *_seen_columns(),
+        schema=SCHEMA,
+    )
+    op.create_index("ix_raw_law_texte_uid", "law", ["texte_uid"], schema=SCHEMA)
+
+    op.create_table(
+        "law_stage",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column(
+            "dossier_uid",
+            sa.String(100),
+            sa.ForeignKey(f"{SCHEMA}.law.dossier_uid", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("code", sa.String(50), nullable=False),
+        sa.Column("label", sa.Text, nullable=False),
+        sa.Column("updated_stage_date", sa.Date),
+        sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+        sa.UniqueConstraint("dossier_uid", "code", "position", name="uq_raw_law_stage"),
+        schema=SCHEMA,
+    )
+
+    op.create_table(
+        "law_article",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("texte_uid", sa.String(100), nullable=False),
+        sa.Column("article_ref", sa.String(100), nullable=False),
+        sa.Column("article_number", sa.Integer),
+        sa.Column("legislature", sa.Integer, nullable=False),
+        sa.Column("content", sa.Text, nullable=False),
+        sa.Column("content_checksum", sa.String(64), nullable=False),
+        sa.Column("version_number", sa.Integer, nullable=False, server_default="1"),
+        sa.Column("is_current", sa.Boolean, nullable=False, server_default=sa.true()),
+        sa.Column("superseded_at", sa.DateTime(timezone=True)),
+        sa.Column("amendment_uid", sa.String(100)),
+        sa.Column("s3_key", sa.Text),
+        sa.Column(
+            "scraped_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
+        schema=SCHEMA,
+    )
+    # One current version per article.
+    op.create_index(
+        "uq_raw_law_article_current",
+        "law_article",
+        ["texte_uid", "article_ref"],
+        unique=True,
+        postgresql_where=sa.text("is_current"),
+        schema=SCHEMA,
+    )
+
+    # ── sittings ─────────────────────────────────────────────────────────────
+    op.create_table(
+        "debate",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column("uid", sa.String(100), nullable=False, unique=True),
+        sa.Column("legislature", sa.Integer, nullable=False),
+        sa.Column("session_number", sa.Integer),
+        sa.Column("session_type", sa.String(50)),
+        sa.Column("date", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("s3_key", sa.Text),
+        *_seen_columns(),
+        schema=SCHEMA,
+    )
+
+    op.create_table(
+        "debate_point",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column(
+            "debate_uid",
+            sa.String(100),
+            sa.ForeignKey(f"{SCHEMA}.debate.uid", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("point_uid", sa.String(100)),
+        sa.Column("title", sa.Text),
+        sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+        sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+        schema=SCHEMA,
+    )
+    op.create_index("ix_raw_debate_point_debate", "debate_point", ["debate_uid"], schema=SCHEMA)
+
+    op.create_table(
+        "intervention",
+        sa.Column("id", sa.BigInteger, primary_key=True),
+        sa.Column(
+            "debate_point_id",
+            sa.BigInteger,
+            sa.ForeignKey(f"{SCHEMA}.debate_point.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column("uid", sa.String(100)),
+        sa.Column("deputy_uid", sa.String(100)),
+        sa.Column("speaker_name", sa.Text),
+        sa.Column("speaker_type", sa.String(50)),
+        sa.Column("content", sa.Text),
+        sa.Column("order_in_debate", sa.Integer),
+        schema=SCHEMA,
+    )
+    op.create_index("ix_raw_intervention_point", "intervention", ["debate_point_id"], schema=SCHEMA)
+
+
+def downgrade() -> None:
+    for table in (
+        "intervention",
+        "debate_point",
+        "debate",
+        "law_article",
+        "law_stage",
+        "law",
+        "mandate",
+        "deputy",
+        "political_group",
+        "ingestion_log",
+        "ingestion_run",
+    ):
+        op.drop_table(table, schema=SCHEMA)
