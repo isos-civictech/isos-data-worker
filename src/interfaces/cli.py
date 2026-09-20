@@ -2,12 +2,13 @@
 Command line entry point (used by Kubernetes Jobs). Exit code 0 if the run is
 acceptable, 1 otherwise.
 """
+
 import argparse
 import asyncio
 
 from loguru import logger
 
-from src.composition import build_collect_deputies, build_engine
+from src.composition import build_collect_deputies, build_engine, build_project_deputies
 from src.config import get_settings
 from src.domain.shared.results import SyncReport
 from src.logging_setup import setup_logging
@@ -17,12 +18,18 @@ async def _collect_deputies(args) -> SyncReport:
     settings = get_settings()
     engine = build_engine(settings)
     try:
-        async with build_collect_deputies(
-            settings, engine, dry_run=args.dry_run
-        ) as use_case:
+        async with build_collect_deputies(settings, engine, dry_run=args.dry_run) as use_case:
             if args.uid:
                 return await use_case.execute_one(args.uid, args.legislature)
             return await use_case.execute(args.legislature, limit=args.limit)
+    finally:
+        await engine.dispose()
+
+
+async def _project_deputies(args) -> SyncReport:
+    engine = build_engine(get_settings())
+    try:
+        return await build_project_deputies(engine).execute(args.legislature)
     finally:
         await engine.dispose()
 
@@ -31,9 +38,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="isos-data-worker")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    collect = sub.add_parser(
-        "collect-deputies", help="Assemblée nationale → raw.deputy"
-    )
+    collect = sub.add_parser("collect-deputies", help="Assemblée nationale → raw.deputy")
     collect.add_argument("--legislature", type=int, default=None)
     collect.add_argument(
         "--limit", type=int, default=None, help="stop after N deputies (development)"
@@ -45,6 +50,10 @@ def _parser() -> argparse.ArgumentParser:
         help="fetch and parse, write nothing",
     )
     collect.set_defaults(handler=_collect_deputies)
+
+    project = sub.add_parser("project-deputies", help="raw.deputy → public.deputy (no network)")
+    project.add_argument("--legislature", type=int, default=None)
+    project.set_defaults(handler=_project_deputies)
 
     return parser
 
