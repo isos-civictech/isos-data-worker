@@ -8,7 +8,13 @@ import asyncio
 
 from loguru import logger
 
-from src.composition import build_collect_deputies, build_engine, build_project_deputies
+from src.composition import (
+    build_collect_debates,
+    build_collect_deputies,
+    build_engine,
+    build_project_debates,
+    build_project_deputies,
+)
 from src.config import get_settings
 from src.domain.shared.results import SyncReport
 from src.logging_setup import setup_logging
@@ -34,6 +40,26 @@ async def _project_deputies(args) -> SyncReport:
         await engine.dispose()
 
 
+async def _collect_debates(args) -> SyncReport:
+    settings = get_settings()
+    engine = build_engine(settings)
+    try:
+        async with build_collect_debates(settings, engine, dry_run=args.dry_run) as use_case:
+            if args.uid:
+                return await use_case.execute_one(args.uid, args.legislature)
+            return await use_case.execute(args.legislature, limit=args.limit)
+    finally:
+        await engine.dispose()
+
+
+async def _project_debates(args) -> SyncReport:
+    engine = build_engine(get_settings())
+    try:
+        return await build_project_debates(engine).execute(args.legislature)
+    finally:
+        await engine.dispose()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="isos-data-worker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -54,6 +80,17 @@ def _parser() -> argparse.ArgumentParser:
     project = sub.add_parser("project-deputies", help="raw.deputy → public.deputy (no network)")
     project.add_argument("--legislature", type=int, default=None)
     project.set_defaults(handler=_project_deputies)
+
+    collect_d = sub.add_parser("collect-debates", help="Assemblée nationale → raw.debate")
+    collect_d.add_argument("--legislature", type=int, default=None)
+    collect_d.add_argument("--limit", type=int, default=None, help="stop after N sittings")
+    collect_d.add_argument("--uid", default=None, help="replay a single sitting")
+    collect_d.add_argument("--dry-run", action="store_true")
+    collect_d.set_defaults(handler=_collect_debates)
+
+    project_d = sub.add_parser("project-debates", help="raw.debate → public.debate (no network)")
+    project_d.add_argument("--legislature", type=int, default=None)
+    project_d.set_defaults(handler=_project_debates)
 
     return parser
 

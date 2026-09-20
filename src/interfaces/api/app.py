@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from src.composition import build_engine
 from src.config import get_settings
 from src.interfaces.api.routes import health, home, jobs
-from src.interfaces.api.routes.sync import deputy
+from src.interfaces.api.routes.sync import debate, deputy
 from src.logging_setup import setup_logging
 
 
@@ -37,4 +37,5 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(jobs.router)
     app.include_router(deputy.router)
+    app.include_router(debate.router)
     return app
