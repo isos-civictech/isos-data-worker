@@ -104,3 +104,15 @@ def test_openapi_is_generated(client):
     paths = response.json()["paths"]
     for expected in ("/", "/health", "/health/db", "/jobs", "/collect/deputies"):
         assert expected in paths, f"{expected} is missing from the OpenAPI schema"
+
+
+def test_every_trigger_route_is_exposed(client):
+    paths = client.get("/openapi.json").json()["paths"]
+    for route in (
+        "/collect/deputies",
+        "/collect/deputies/{uid}",
+        "/project/deputies",
+        "/sync/deputies",
+        "/sync/deputies/{uid}",
+    ):
+        assert "post" in paths[route], f"{route} must be a POST"
