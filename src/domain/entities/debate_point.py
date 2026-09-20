@@ -10,6 +10,7 @@ XML path: compteRendu/pointsOrdreJour/point
     order       → position in the pointsOrdreJour list (1-indexed)
 
 """
+
 from pydantic import BaseModel, ConfigDict
 
 from src.domain.entities.intervention import Intervention

@@ -22,6 +22,7 @@ JSON field mapping:
     non_voting_count → scrutin/syntheseVote/decompte/nonVotants
     votes            → scrutin/ventilationVotes/organe[]/groupe[]/vote[]
 """
+
 from datetime import datetime
 from enum import StrEnum
 
@@ -33,41 +34,47 @@ from src.domain.shared.validators import Legislature, NotBlankStr
 class VoteResult(StrEnum):
     ADOPTED = "adopté"
     REJECTED = "rejeté"
-    
+
+
 class VotePosition(StrEnum):
-    IN_FAVOR  = "pour"
-    AGAINST   = "contre"
+    IN_FAVOR = "pour"
+    AGAINST = "contre"
     ABSTENTION = "abstention"
     NON_VOTING = "nonVotant"
-    
+
+
 class Voter(BaseModel):
     """One deputy's individual vote record."""
+
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     deputy_uid: NotBlankStr
     mandate_uid: str | None = None
     by_delegation: bool = False
 
+
 class NominalVoteCount(BaseModel):
     """Individual votes grouped by position — mirrors source JSON structure."""
+
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     in_favor: list[Voter] = Field(default_factory=list, alias="pours")
     against: list[Voter] = Field(default_factory=list, alias="contres")
     abstention: list[Voter] = Field(default_factory=list, alias="abstentions")
     non_voting: list[Voter] = Field(default_factory=list, alias="nonVotants")
-    non_voting_voluntary: list[Voter] = Field(
-        default_factory=list, alias="nonVotantsVolontaires"
-    )
+    non_voting_voluntary: list[Voter] = Field(default_factory=list, alias="nonVotantsVolontaires")
+
 
 class RollCallVote(BaseModel):
     """Individual vote by one deputy on an assembly vote."""
+
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     deputy_uid: NotBlankStr
     mandate_uid: str | None = None
     position: VotePosition
     by_delegation: bool = False
+
 
 class AssemblyVote(BaseModel):
     model_config = ConfigDict(
@@ -90,7 +97,7 @@ class AssemblyVote(BaseModel):
     abstention_count: int = 0
     non_voting_count: int = 0
     roll_call_votes: NominalVoteCount = Field(default_factory=NominalVoteCount)
-    
+
     @field_validator("votes_in_favor", "votes_against", "abstention_count", "non_voting_count")
     @classmethod
     def must_be_positive(cls, v: int) -> int:

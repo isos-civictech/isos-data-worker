@@ -21,6 +21,7 @@ JSON field mapping (root key: dossierParlementaire):
         if null or organe only             → government bill
 
 """
+
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, computed_field
@@ -34,10 +35,11 @@ class LawType(StrEnum):
     procedureParlementaire/code values from real DLR files.
     ⚠️ Complete this enum as more codes are discovered.
     """
-    ORDINARY_MEMBER_BILL = "2"      # ordinary member bill
-    INFORMATION_REPORT = "19"       # information report
-    LAW_PROJECT = "1"               # government bill --- TO BE CONFIRMED
-    OTHER = "0"                     # fallback for unknown codes
+
+    ORDINARY_MEMBER_BILL = "2"  # ordinary member bill
+    INFORMATION_REPORT = "19"  # information report
+    LAW_PROJECT = "1"  # government bill --- TO BE CONFIRMED
+    OTHER = "0"  # fallback for unknown codes
 
 
 class LawStatus(StrEnum):
@@ -58,7 +60,7 @@ class Law(BaseModel):
     legislature: Legislature
     title: NotBlankStr
     law_type: LawType
-    initiateur_uid: str | None = None           # "PA775234" if deputy, None if government/null
+    initiateur_uid: str | None = None  # "PA775234" if deputy, None if government/null
     stages: list[LegislativeStage] = []
     closure_status: LawStatus | None = None
 
@@ -80,7 +82,4 @@ class Law(BaseModel):
     @computed_field
     @property
     def is_promulgated(self) -> bool:
-        return any(
-            s.code == "PROM" and s.updated_stage_date is not None
-            for s in self.stages
-        )
+        return any(s.code == "PROM" and s.updated_stage_date is not None for s in self.stages)

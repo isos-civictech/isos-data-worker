@@ -27,6 +27,7 @@ Lifecycle:
 
 S3 path: raw/agenda/{legislature}/{year}/{month}/Agenda.xml.zip (full ZIP)
 """
+
 from datetime import UTC, datetime
 from enum import StrEnum
 
@@ -40,6 +41,7 @@ class SessionStatus(StrEnum):
     ONGOING = "en cours"
     COMPLETED = "terminée"
     CANCELLED = "annulée"
+
 
 class AgendaItem(BaseModel):
     model_config = ConfigDict(
@@ -78,4 +80,3 @@ class AgendaItem(BaseModel):
     @property
     def is_ready_to_scrape(self) -> bool:
         return self.status == SessionStatus.COMPLETED and self.debate_uid is None
-    

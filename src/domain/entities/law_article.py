@@ -6,6 +6,7 @@ Source: HTML pages (NOT in ZIP files)
 
 S3 path: raw/law_articles/{legislature}/{texte_uid}/{article_ref}_{version}.html
 """
+
 from datetime import datetime
 from enum import StrEnum
 

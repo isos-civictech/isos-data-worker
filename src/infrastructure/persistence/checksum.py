@@ -2,6 +2,7 @@
 sha256_text: normalised text, drives article versioning.
 sha256_bytes: raw file, drives the ingestion log.
 """
+
 import hashlib
 
 

@@ -4,6 +4,7 @@ Collect deputies from the Assemblée nationale into `raw`.
 Depends on ports only. Groups are stored before deputies (mandates reference
 them by uid). A failing record is counted and logged; the run goes on.
 """
+
 from loguru import logger
 
 from src.domain.ports.repositories.deputy_repository import DeputyRepository
@@ -89,9 +90,7 @@ class CollectDeputies:
 
         report.processed = 1
         try:
-            outcome = await self._repository.save(
-                deputy, legislature=legislature, run_id=run_id
-            )
+            outcome = await self._repository.save(deputy, legislature=legislature, run_id=run_id)
             report.created += int(outcome.created)
             report.updated += int(not outcome.created)
         except Exception:

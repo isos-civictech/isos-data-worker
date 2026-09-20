@@ -7,6 +7,7 @@ Retry policy, and the reasoning behind it:
   - 4xx is NEVER retried.
   - database writes are not retried at all.
 """
+
 import httpx
 from loguru import logger
 from tenacity import (
@@ -57,7 +58,7 @@ class HttpClient:
     async def _get(self, url: str) -> httpx.Response:
         if self._client is None:
             raise RuntimeError("HttpClient must be used as an async context manager")
-        
+
         @retry(
             stop=stop_after_attempt(self._max_attempts),
             wait=wait_exponential(multiplier=1, min=1, max=10),

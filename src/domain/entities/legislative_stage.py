@@ -9,6 +9,7 @@ Known stage codes (non-exhaustive list):
     AN20-RAPPORT        → Dépôt de rapport
     PROM                → Promulgation
 """
+
 from datetime import date
 
 from pydantic import BaseModel, ConfigDict

@@ -8,6 +8,7 @@ The archive uses a default XML namespace; every lookup goes through `_text()`,
 which ignores it. An <acteur> holds several <mandat> nodes: ASSEMBLEE is the
 seat, the active GP one is the group, the rest is ignored.
 """
+
 from lxml import etree
 
 from src.domain.entities.deputy import Deputy

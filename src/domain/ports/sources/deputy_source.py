@@ -1,4 +1,5 @@
 """Port: read deputies and political groups from the Assemblée nationale."""
+
 from abc import ABC, abstractmethod
 
 from src.domain.entities.deputy import Deputy
