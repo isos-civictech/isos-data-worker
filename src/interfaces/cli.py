@@ -5,6 +5,7 @@ acceptable, 1 otherwise.
 
 import argparse
 import asyncio
+from datetime import date
 
 from loguru import logger
 
@@ -47,7 +48,9 @@ async def _collect_debates(args) -> SyncReport:
         async with build_collect_debates(settings, engine, dry_run=args.dry_run) as use_case:
             if args.uid:
                 return await use_case.execute_one(args.uid, args.legislature)
-            return await use_case.execute(args.legislature, limit=args.limit)
+            return await use_case.execute(
+                args.legislature, limit=args.limit, since=args.since, until=args.until
+            )
     finally:
         await engine.dispose()
 
@@ -85,6 +88,11 @@ def _parser() -> argparse.ArgumentParser:
     collect_d.add_argument("--legislature", type=int, default=None)
     collect_d.add_argument("--limit", type=int, default=None, help="stop after N sittings")
     collect_d.add_argument("--uid", default=None, help="replay a single sitting")
+    collect_d.add_argument(
+        "--date", type=date.fromisoformat, default=None, help="one day (YYYY-MM-DD)"
+    )
+    collect_d.add_argument("--since", type=date.fromisoformat, default=None, help="from this day")
+    collect_d.add_argument("--until", type=date.fromisoformat, default=None, help="up to this day")
     collect_d.add_argument("--dry-run", action="store_true")
     collect_d.set_defaults(handler=_collect_debates)
 
@@ -102,6 +110,8 @@ def main() -> int:
 
     if getattr(args, "legislature", None) is None:
         args.legislature = settings.an_legislature
+    if getattr(args, "date", None):
+        args.since = args.until = args.date
 
     logger.info("target database={}", settings.safe_database_target)
 

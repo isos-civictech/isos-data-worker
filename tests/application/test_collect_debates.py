@@ -19,7 +19,7 @@ class FakeSource(DebateSource):
         self._debates = debates
         self.last_s3_key = "raw/debates/17/syceron.xml.zip"
 
-    async def fetch_all(self, legislature, limit=None):
+    async def fetch_all(self, legislature, limit=None, since=None, until=None):
         return self._debates[:limit] if limit else self._debates
 
     async def fetch_by_uid(self, uid, legislature):

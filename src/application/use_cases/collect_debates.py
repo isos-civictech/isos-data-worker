@@ -5,6 +5,8 @@ Same shape as collect_deputies: ports only, one save per sitting, a failing
 record is counted and logged and the run goes on.
 """
 
+from datetime import date
+
 from loguru import logger
 
 from src.domain.ports.repositories.debate_repository import DebateRepository
@@ -29,19 +31,27 @@ class CollectDebates:
         self._log = log_repository
         self._dry_run = dry_run
 
-    async def execute(self, legislature: int, limit: int | None = None) -> SyncReport:
+    async def execute(
+        self,
+        legislature: int,
+        limit: int | None = None,
+        since: date | None = None,
+        until: date | None = None,
+    ) -> SyncReport:
         report = SyncReport(entity=ENTITY)
         source_url = getattr(self._source, "archive_url", lambda _: None)(legislature)
         run_id = await self._log.start_run(ENTITY, source_url=source_url)
         logger.info(
-            "collect.start entity={} legislature={} limit={} dry_run={}",
+            "collect.start entity={} legislature={} limit={} since={} until={} dry_run={}",
             ENTITY,
             legislature,
             limit,
+            since,
+            until,
             self._dry_run,
         )
 
-        debates = await self._source.fetch_all(legislature, limit=limit)
+        debates = await self._source.fetch_all(legislature, limit=limit, since=since, until=until)
         s3_key = getattr(self._source, "last_s3_key", None)
 
         for debate in debates:

@@ -8,7 +8,8 @@ Points nest through <point> inside <point>; they are flattened with `level`
 and `parent_uid`. Paragraphs without an <orateur> are heckles and are dropped.
 """
 
-from datetime import datetime
+import re
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from lxml import etree
@@ -27,6 +28,8 @@ MEMBER_PREFIX = "xml/compteRendu/"
 # Syceron times are Paris local time with no offset. Made explicit here, or the
 # result depends on the timezone of whatever machine runs the worker.
 PARIS = ZoneInfo("Europe/Paris")
+# The sitting date sits in the first ~500 bytes: cheap to read without parsing.
+_DATE_HEAD = re.compile(rb"<dateSeance>(\d{8})")
 
 
 def _text(node, path: str) -> str | None:
@@ -64,6 +67,17 @@ def _texte_number(bibard: str | None) -> str | None:
     return digits or None
 
 
+def _in_range(content: bytes, since: date | None, until: date | None) -> bool:
+    """Filter on the sitting date read from the file head, before any XML parsing."""
+    if since is None and until is None:
+        return True
+    match = _DATE_HEAD.search(content[:2000])
+    if not match:
+        return True  # unknown date: let the parser decide
+    sitting = datetime.strptime(match.group(1).decode(), "%Y%m%d").date()
+    return (since is None or sitting >= since) and (until is None or sitting <= until)
+
+
 def _speaker_type(deputy_uid: str | None, name: str | None, quality: str | None) -> SpeakerType:
     if quality:
         return SpeakerType.MINISTER
@@ -96,13 +110,24 @@ class AnDebateAdapter(DebateSource):
             self._cache[legislature] = payload
         return self._cache[legislature]
 
-    async def fetch_all(self, legislature: Legislature, limit: int | None = None) -> list[Debate]:
+    async def fetch_all(
+        self,
+        legislature: Legislature,
+        limit: int | None = None,
+        since: date | None = None,
+        until: date | None = None,
+    ) -> list[Debate]:
         payload = await self._archive(legislature)
-        debates = (
-            self._parse_compte_rendu(content, legislature)
-            for _, content in iter_zip_members(payload, prefix=MEMBER_PREFIX, limit=limit)
-        )
-        return [d for d in debates if d is not None]
+        debates: list[Debate] = []
+        for _, content in iter_zip_members(payload, prefix=MEMBER_PREFIX):
+            if not _in_range(content, since, until):
+                continue
+            parsed = self._parse_compte_rendu(content, legislature)
+            if parsed is not None:
+                debates.append(parsed)
+                if limit is not None and len(debates) >= limit:
+                    break
+        return debates
 
     async def fetch_by_uid(self, uid: str, legislature: Legislature) -> Debate | None:
         payload = await self._archive(legislature)

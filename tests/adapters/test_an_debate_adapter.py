@@ -120,3 +120,16 @@ async def test_fetch_all_and_archive_stored():
 
     assert [d.uid for d in debates] == ["CRSANR5L17S2025O1N037"]
     assert "raw/debates/17/syceron.xml.zip" in storage.objects
+
+
+def test_date_range_filter_reads_the_file_head():
+    from datetime import date
+
+    from src.infrastructure.adapters.an_debate_adapter import _in_range
+
+    content = FIXTURE.read_bytes()  # sitting on 2024-11-06
+    assert _in_range(content, None, None)
+    assert _in_range(content, date(2024, 11, 6), date(2024, 11, 6))
+    assert _in_range(content, date(2024, 11, 1), None)
+    assert not _in_range(content, date(2024, 11, 7), None)
+    assert not _in_range(content, None, date(2024, 11, 5))
