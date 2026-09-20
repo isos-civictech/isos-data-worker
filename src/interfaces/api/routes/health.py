@@ -21,7 +21,5 @@ async def health_db(engine: AsyncEngine = Depends(get_engine)):
         async with engine.connect() as connection:
             await connection.execute(sa.text("SELECT 1"))
     except Exception as exc:
-        return JSONResponse(
-            status_code=503, content={"status": "unavailable", "detail": str(exc)}
-        )
+        return JSONResponse(status_code=503, content={"status": "unavailable", "detail": str(exc)})
     return {"status": "ok"}

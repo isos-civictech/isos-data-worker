@@ -2,6 +2,7 @@
 Entity → `raw` row. Pure transcription: no slug, no enum translation, no FK
 resolution. Fields the display schema lacks (gender, profession) are kept.
 """
+
 from typing import Any
 
 from src.domain.entities.deputy import Deputy

@@ -16,6 +16,7 @@ XML field mapping:
 
 S3 path: raw/debates/{legislature}/{year}/{month}/{uid}.xml
 """
+
 from datetime import datetime
 from enum import StrEnum
 
@@ -43,10 +44,8 @@ class Debate(BaseModel):
     session_type: SessionType = SessionType.OTHER
     date: datetime
 
-    
     points: list[DebatePoint] = []
 
-    
     s3_key: str | None = None
 
     # ── Computed ──────────────────────────────────────────────────────────────

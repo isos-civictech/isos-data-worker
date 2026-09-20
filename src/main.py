@@ -1,4 +1,5 @@
 """Container entry point: `python -m src.main`."""
+
 import uvicorn
 
 from src.config import get_settings

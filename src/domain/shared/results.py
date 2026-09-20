@@ -1,13 +1,16 @@
 """
 Execution results — the common vocabulary for use cases.
 """
+
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 FAILURE_RATE_THRESHOLD = 0.2
 
+
 def _now() -> datetime:
     return datetime.now(tz=UTC)
+
 
 @dataclass(frozen=True)
 class SaveOutcome:

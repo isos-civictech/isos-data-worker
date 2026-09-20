@@ -33,6 +33,7 @@ class AmendmentAuthorType(StrEnum):
     GOVERNMENT = "Gouvernement"
     COMMISSION = "Commission"
 
+
 class AmendmentSort(StrEnum):
     ADOPTED = "Adopté"
     REJECTED = "Rejeté"
@@ -40,7 +41,7 @@ class AmendmentSort(StrEnum):
     LAPSED = "Tombé"
     INADMISSIBLE = "Irrecevable"
     UNSUPPORTED = "Non soutenu"
-    UNREPORTED    = "Non renseigné" 
+    UNREPORTED = "Non renseigné"
     PENDING = "En attente"
 
 

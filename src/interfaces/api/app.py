@@ -1,13 +1,15 @@
 """
 FastAPI application. Port 8001 matches the Kubernetes Service in isos-ops.
 """
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from src.composition import build_engine
 from src.config import get_settings
-from src.interfaces.api.routes import health, home, jobs, sync
+from src.interfaces.api.routes import health, home, jobs
+from src.interfaces.api.routes.sync import deputy
 from src.logging_setup import setup_logging
 
 
@@ -34,5 +36,5 @@ def create_app() -> FastAPI:
     app.include_router(home.router)
     app.include_router(health.router)
     app.include_router(jobs.router)
-    app.include_router(sync.router)
+    app.include_router(deputy.router)
     return app

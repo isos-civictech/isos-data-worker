@@ -4,13 +4,14 @@ for the worker's Alembic.
 
 Conventions: BIGSERIAL id + AN uid as UNIQUE natural key; nothing is ever
 deleted. On every root table:
-    first_seen_at   first insert
-    last_seen_at    last run in which the AN export still contained it — a row
-                    that stops advancing means the entity left the export
-    updated_at      last time the content actually changed
-    last_run_id     the ingestion_run that last touched it
+    created_at         first insert
+    updated_at         last time the content actually changed
+    ingestion_run_id   the run that last touched the row — join ingestion_run
+                       for its date and its raw file (s3_key)
+    s3_key             the archive this row was parsed from
 Column names follow the source vocabulary; translation is the projection's job.
 """
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 
@@ -33,18 +34,12 @@ def _seen_columns() -> list[sa.Column]:
     return [
         sa.Column("s3_key", sa.Text),
         sa.Column(
-            "last_run_id",
+            "ingestion_run_id",
             sa.BigInteger,
             sa.ForeignKey("raw.ingestion_run.id", ondelete="SET NULL"),
         ),
         sa.Column(
-            "first_seen_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column(
-            "last_seen_at",
+            "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.func.now(),
@@ -78,7 +73,6 @@ ingestion_run = sa.Table(
     ),
     sa.Column("finished_at", sa.DateTime(timezone=True)),
 )
-
 
 
 # ── Referential ───────────────────────────────────────────────────────────────

@@ -44,6 +44,7 @@ class Mandate(BaseModel):
     """
     Represents a single term in the National Assembly.
     """
+
     model_config = ConfigDict(
         populate_by_name=True,
         from_attributes=True,
@@ -56,7 +57,7 @@ class Mandate(BaseModel):
     mandate_start: date | None = None
     mandate_end: date | None = None
 
-    group_uid: str | None = None       # "PO845401", from the active GP mandat
+    group_uid: str | None = None  # "PO845401", from the active GP mandat
     group_acronym: str | None = None
     group_name: str | None = None
 

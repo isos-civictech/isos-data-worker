@@ -10,6 +10,7 @@ XML path: compteRendu/interventions/intervention
     content          → intervention/texte
     order_in_debate  → intervention/ordre
 """
+
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict

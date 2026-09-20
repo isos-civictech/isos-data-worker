@@ -1,4 +1,5 @@
 """Welcome page."""
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
@@ -50,14 +51,20 @@ _PAGE = """<!doctype html>
 
   <h2>Déclencher</h2>
   <table>
-    <tr><td>POST /collect/deputies</td><td>tous les députés — options
+    <tr><td>POST /sync/deputies</td><td><b>tout d'un coup</b> : Assemblée → raw → public.
+        Ajoute ou met à jour, c'est la même chose.</td></tr>
+    <tr><td>POST /sync/deputies/{uid}</td><td>un seul député, jusqu'à public</td></tr>
+    <tr><td>POST /collect/deputies</td><td>Assemblée → raw seulement — options
         <code>legislature</code>, <code>limit</code>, <code>dry_run</code></td></tr>
-    <tr><td>POST /collect/deputies/{uid}</td><td>un seul député, par son uid AN</td></tr>
+    <tr><td>POST /collect/deputies/{uid}</td><td>un seul, raw seulement</td></tr>
+    <tr><td>POST /project/deputies</td><td>raw → public seulement, sans réseau —
+        à relancer après une correction de projection</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>
   <div class="flow">python -m src.interfaces.cli collect-deputies --limit 5 --dry-run
-python -m src.interfaces.cli collect-deputies --legislature 17</div>
+python -m src.interfaces.cli collect-deputies --legislature 17
+python -m src.interfaces.cli project-deputies</div>
 
   <h2>Documentation</h2>
   <p><a href="/docs">/docs</a> — référence OpenAPI interactive.</p>

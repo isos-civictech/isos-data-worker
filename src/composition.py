@@ -2,12 +2,14 @@
 Composition root — the only module that imports both `infrastructure` and
 `application`. The API and the CLI both build their use cases here.
 """
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.application.use_cases.collect_deputies import CollectDeputies
+from src.application.use_cases.project_deputies import ProjectDeputies
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
 from src.infrastructure.adapters.an_deputy_adapter import AnDeputyAdapter
@@ -17,6 +19,7 @@ from src.infrastructure.persistence.raw.deputy_repository import SqlRawDeputyRep
 from src.infrastructure.persistence.raw.ingestion_log_repository import (
     SqlIngestionLogRepository,
 )
+from src.infrastructure.persistence.serving.deputy_projection import SqlDeputyProjection
 from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
 
 
@@ -57,3 +60,7 @@ async def build_collect_deputies(
             log_repository=SqlIngestionLogRepository(engine),
             dry_run=dry_run,
         )
+
+
+def build_project_deputies(engine: AsyncEngine) -> ProjectDeputies:
+    return ProjectDeputies(projection=SqlDeputyProjection(engine))
