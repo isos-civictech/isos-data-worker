@@ -1,14 +1,18 @@
 """
-Intervention — one speech by one person inside a DebatePoint.
+Intervention — one speech inside a DebatePoint.
 
-Source: Syceron XML
-XML path: compteRendu/interventions/intervention
-    uid              → intervention/uid
-    deputy_uid       → intervention/acteurRef       (absent if not a deputy)
-    speaker_name     → intervention/orateur/nom + prenom
-    speaker_type     → derived from acteurRef presence + orateur/qualite
-    content          → intervention/texte
-    order_in_debate  → intervention/ordre
+XML field mapping (point/paragraphe):
+    uid              → @id_syceron
+    deputy_uid       → @id_acteur                ("PA…"; ministers are often deputies too)
+    speaker_name     → paragraphe/orateurs/orateur/nom
+    speaker_type     → derived: orateur/qualite non-empty → MINISTER,
+                                nom contains "président" → PRESIDENT,
+                                @id_acteur starts with PA → DEPUTY
+    content          → paragraphe/texte
+    order_in_debate  → @ordre_absolu_seance
+
+Paragraphs without an <orateur> (code_grammaire INTERRUPTION_*) are heckles
+with no attributable speaker; they are not kept.
 """
 
 from enum import StrEnum
