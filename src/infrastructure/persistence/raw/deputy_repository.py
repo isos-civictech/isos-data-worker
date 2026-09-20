@@ -2,6 +2,7 @@
 Deputy persistence in `raw`. One transaction per deputy: the deputy and its
 mandates land together or not at all.
 """
+
 from typing import Any
 
 import sqlalchemy as sa
@@ -21,7 +22,7 @@ from src.infrastructure.persistence.raw.mappers.deputy_mapper import (
 )
 
 # Bookkeeping columns: never part of the "did the content change?" comparison.
-_TRACKING = {"first_seen_at", "last_seen_at", "updated_at", "last_run_id", "s3_key"}
+_TRACKING = {"created_at", "updated_at", "ingestion_run_id", "s3_key"}
 
 
 def _upsert(table: sa.Table, row: dict[str, Any], *, key: str, tracked: bool = True):
@@ -40,7 +41,6 @@ def _upsert(table: sa.Table, row: dict[str, Any], *, key: str, tracked: bool = T
         changed = sa.tuple_(*(table.c[c] for c in content)).is_distinct_from(
             sa.tuple_(*(excluded[c] for c in content))
         )
-        updates["last_seen_at"] = sa.func.now()
         updates["updated_at"] = sa.case((changed, sa.func.now()), else_=table.c.updated_at)
 
     return statement.on_conflict_do_update(index_elements=[key], set_=updates).returning(
@@ -60,7 +60,7 @@ class SqlRawDeputyRepository(DeputyRepository):
         run_id: int,
         s3_key: str | None = None,
     ) -> SaveOutcome:
-        tracking = {"last_run_id": run_id, "s3_key": s3_key}
+        tracking = {"ingestion_run_id": run_id, "s3_key": s3_key}
         row = deputy_row(deputy, legislature=legislature) | tracking
         async with transaction(self._engine) as connection:
             deputy_id, created = (
@@ -79,6 +79,6 @@ class SqlRawDeputyRepository(DeputyRepository):
             return 0
         async with transaction(self._engine) as connection:
             for group in groups:
-                row = political_group_row(group) | {"last_run_id": run_id, "s3_key": s3_key}
+                row = political_group_row(group) | {"ingestion_run_id": run_id, "s3_key": s3_key}
                 await connection.execute(_upsert(tables.political_group, row, key="uid"))
         return len(groups)
