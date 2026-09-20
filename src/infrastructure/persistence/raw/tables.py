@@ -207,10 +207,11 @@ debate = sa.Table(
     sa.Column("session_number", sa.Integer),
     sa.Column("session_type", sa.String(50)),
     sa.Column("date", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("title", sa.Text),
     *_seen_columns(),
 )
 
-# Agenda item ("point d'ordre du jour"): the per-topic level.
+# Agenda item ("point d'ordre du jour"): the per-topic level. Points nest.
 debate_point = sa.Table(
     "debate_point",
     metadata,
@@ -221,9 +222,13 @@ debate_point = sa.Table(
         sa.ForeignKey("raw.debate.uid", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("point_uid", sa.String(100)),
+    sa.Column("point_uid", sa.String(100), nullable=False, unique=True),  # id_syceron
+    sa.Column("parent_uid", sa.String(100)),
     sa.Column("title", sa.Text),
+    sa.Column("kind", sa.String(50)),  # code_grammaire: QG_1_1, DISC_ARTICLES_3_1, …
+    sa.Column("level", sa.Integer, nullable=False, server_default="1"),
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+    # Text NUMBERS (bibard), not uids: the join to a law goes through the number.
     sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_debate_point_debate", "debate_uid"),
 )
@@ -238,7 +243,7 @@ intervention = sa.Table(
         sa.ForeignKey("raw.debate_point.id", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("uid", sa.String(100)),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # id_syceron
     sa.Column("deputy_uid", sa.String(100)),
     sa.Column("speaker_name", sa.Text),
     sa.Column("speaker_type", sa.String(50)),
