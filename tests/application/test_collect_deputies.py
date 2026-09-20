@@ -1,4 +1,5 @@
 """Use case tests with plain fakes — no database, no network, no mocks."""
+
 import pytest
 
 from src.application.use_cases.collect_deputies import CollectDeputies
