@@ -110,3 +110,26 @@ debate_law = sa.Table(
     sa.Column("law_id", sa.Integer, primary_key=True),
     sa.Column("law_reading_id", sa.Integer),
 )
+
+amendment = sa.Table(
+    "amendment",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("law_id", sa.Integer, nullable=False),
+    sa.Column("debate_id", sa.Integer),
+    sa.Column("law_reading_id", sa.Integer),
+    sa.Column("number", sa.String(20)),
+    sa.Column("examined_by", sa.String(50)),
+    sa.Column("article_ref", sa.String(255)),
+    sa.Column(
+        "author_type", pg.ENUM(name="amendment_author_type", create_type=False), nullable=False
+    ),
+    sa.Column("deputy_id", sa.Integer),
+    sa.Column("political_group_id", sa.Integer),
+    sa.Column("content", sa.Text),
+    sa.Column("summary", sa.Text),
+    sa.Column("status", pg.ENUM(name="amendment_status", create_type=False), nullable=False),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("external_id", sa.String(100)),
+    sa.Column("updated_at", sa.DateTime(timezone=True)),
+)

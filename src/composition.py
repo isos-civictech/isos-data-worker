@@ -9,22 +9,26 @@ from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.application.use_cases.collect_agenda import CollectAgenda
+from src.application.use_cases.collect_amendments import CollectAmendments
 from src.application.use_cases.collect_debates import CollectDebates
 from src.application.use_cases.collect_deputies import CollectDeputies
 from src.application.use_cases.collect_laws import CollectLaws
 from src.application.use_cases.project_agenda import ProjectAgenda
+from src.application.use_cases.project_amendments import ProjectAmendments
 from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.application.use_cases.project_laws import ProjectLaws
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
 from src.infrastructure.adapters.an_agenda_adapter import AnAgendaAdapter
+from src.infrastructure.adapters.an_amendment_adapter import AnAmendmentAdapter
 from src.infrastructure.adapters.an_debate_adapter import AnDebateAdapter
 from src.infrastructure.adapters.an_deputy_adapter import AnDeputyAdapter
 from src.infrastructure.adapters.an_law_adapter import AnLawAdapter
 from src.infrastructure.http.client import HttpClient
 from src.infrastructure.persistence.engine import create_engine
 from src.infrastructure.persistence.raw.agenda_repository import SqlRawAgendaRepository
+from src.infrastructure.persistence.raw.amendment_repository import SqlRawAmendmentRepository
 from src.infrastructure.persistence.raw.debate_repository import SqlRawDebateRepository
 from src.infrastructure.persistence.raw.deputy_repository import SqlRawDeputyRepository
 from src.infrastructure.persistence.raw.ingestion_log_repository import (
@@ -32,6 +36,7 @@ from src.infrastructure.persistence.raw.ingestion_log_repository import (
 )
 from src.infrastructure.persistence.raw.law_repository import SqlRawLawRepository
 from src.infrastructure.persistence.serving.agenda_projection import SqlAgendaProjection
+from src.infrastructure.persistence.serving.amendment_projection import SqlAmendmentProjection
 from src.infrastructure.persistence.serving.debate_projection import SqlDebateProjection
 from src.infrastructure.persistence.serving.deputy_projection import SqlDeputyProjection
 from src.infrastructure.persistence.serving.law_projection import SqlLawProjection
@@ -152,3 +157,28 @@ async def build_collect_laws(
 
 def build_project_laws(engine: AsyncEngine) -> ProjectLaws:
     return ProjectLaws(projection=SqlLawProjection(engine))
+
+
+@asynccontextmanager
+async def build_collect_amendments(
+    settings: Settings,
+    engine: AsyncEngine,
+    *,
+    dry_run: bool = False,
+) -> AsyncIterator[CollectAmendments]:
+    storage = build_storage(settings)
+    async with HttpClient(
+        # ~340 MB archive.
+        timeout_s=max(settings.http_timeout_s, 600.0),
+        max_attempts=settings.http_max_attempts,
+    ) as http:
+        yield CollectAmendments(
+            source=AnAmendmentAdapter(http, storage, settings.an_base_url),
+            repository=SqlRawAmendmentRepository(engine),
+            log_repository=SqlIngestionLogRepository(engine),
+            dry_run=dry_run,
+        )
+
+
+def build_project_amendments(engine: AsyncEngine) -> ProjectAmendments:
+    return ProjectAmendments(projection=SqlAmendmentProjection(engine))

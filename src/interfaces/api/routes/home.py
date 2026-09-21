@@ -69,6 +69,10 @@ _PAGE = """<!doctype html>
         loi, leurs lectures, et le lien <code>debate_law</code> vers les séances —
         à lancer <b>après</b> l'agenda</td></tr>
     <tr><td>GET /laws/{uid}</td><td>un dossier (DLR…) et ses étapes, tel que collecté</td></tr>
+    <tr><td>POST /sync/amendments</td><td>les amendements, séance et commission — archive de
+        340 Mo, comptez quelques minutes ; options <code>dossier</code>, <code>since</code>.
+        À lancer <b>après</b> les lois et les députés</td></tr>
+    <tr><td>GET /laws/{uid}/amendments</td><td>les amendements d'un dossier</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>

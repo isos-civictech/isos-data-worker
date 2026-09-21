@@ -22,6 +22,12 @@ class SaveOutcome:
     created: bool
 
 
+@dataclass(frozen=True)
+class BatchOutcome:
+    created: int
+    updated: int
+
+
 @dataclass
 class SyncReport:
     """

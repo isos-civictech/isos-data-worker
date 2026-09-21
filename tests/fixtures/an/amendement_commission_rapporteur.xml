@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<amendement xmlns="http://schemas.assemblee-nationale.fr/referentiel">
+  <uid>AMANR5L17PO59051B2681P0D1N000368</uid>
+  <chronotag>1781034286234</chronotag>
+  <legislature>17</legislature>
+  <identification>
+    <numeroLong>CL368</numeroLong>
+    <numeroOrdreDepot>368</numeroOrdreDepot>
+    <prefixeOrganeExamen>CION_LOIS</prefixeOrganeExamen>
+    <numeroRect>0</numeroRect>
+  </identification>
+  <examenRef>EXANR5L17PO59051B2681P0D1</examenRef>
+  <texteLegislatifRef>PRJLANR5L17B2681</texteLegislatifRef>
+  <triAmendement>caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaob</triAmendement>
+  <cardinaliteAmdtMultiples>1</cardinaliteAmdtMultiples>
+  <amendementParentRef xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+  <signataires>
+    <auteur>
+      <typeAuteur>Rapporteur</typeAuteur>
+      <gouvernementRef xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+      <acteurRef>PA805166</acteurRef>
+      <groupePolitiqueRef>PO845454</groupePolitiqueRef>
+      <auteurRapporteurOrganeRef xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    </auteur>
+    <cosignataires>
+      <acteurRef>PA817203</acteurRef>
+    </cosignataires>
+    <suffixe xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    <libelle> Mme&amp;#160;Bergantz, rapporteure et Mme&amp;#160;Miller, rapporteure</libelle>
+  </signataires>
+  <pointeurFragmentTexte>
+    <partieAmendableRef xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    <division>
+      <titre>Article 3</titre>
+      <articleDesignationCourte>ART. 3</articleDesignationCourte>
+      <articleDesignation>ARTICLE 3</articleDesignation>
+      <type>ARTICLE</type>
+      <avant_A_Apres>A</avant_A_Apres>
+      <divisionRattachee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+      <articleAdditionnel>false</articleAdditionnel>
+      <chapitreAdditionnel>false</chapitreAdditionnel>
+      <urlDivisionTexteVise>/17/textes/2681.asp#D_Article_3</urlDivisionTexteVise>
+    </division>
+    <amendementStandard>
+      <alinea>
+        <avant_A_Apres>Apres</avant_A_Apres>
+        <numero>34</numero>
+        <alineaDesignation>Après l'alinéa 34</alineaDesignation>
+      </alinea>
+    </amendementStandard>
+  </pointeurFragmentTexte>
+  <corps>
+    <cartoucheInformatif xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    <contenuAuteur>
+      <dispositif>&lt;p style="text-align: justify;"&gt;Apr&amp;#x00E8;s l&amp;#x2019;alin&amp;#x00E9;a&amp;nbsp;34, ins&amp;#x00E9;rer l&amp;#x2019;alin&amp;#x00E9;a suivant&amp;nbsp;:&lt;/p&gt;&lt;p style="text-align: justify;"&gt;&amp;#x00AB;&amp;nbsp;10&amp;#x00B0; Des d&amp;#x00E9;lits de s&amp;#x00E9;vices graves ou actes de cruaut&amp;#x00E9; envers les animaux pr&amp;#x00E9;vus &amp;#x00E0; l&amp;#x2019;article&amp;nbsp;521&amp;#x2011;1 &amp;#x00E0; 521&amp;#x2011;2 du m&amp;#x00EA;me code.&amp;nbsp;&amp;#x00BB;&lt;/p&gt;</dispositif>
+      <avantAppel xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+      <exposeSommaire>&lt;p style="text-align: justify;"&gt;Le pr&amp;#x00E9;sent amendement vise &amp;#x00E0; compl&amp;#x00E9;ter les infractions pouvant donner lieu &amp;#x00E0; l&amp;#x2019;inscription au Fnaeg, lorsque les investigations qu&amp;#x2019;elles peuvent entra&amp;#x00EE;ner justifient de recourir aux analyses g&amp;#x00E9;n&amp;#x00E9;tiques.&lt;/p&gt;&lt;p style="text-align: justify;"&gt;Il inclut, ainsi, les s&amp;#x00E9;vices graves ou actes de cruaut&amp;#x00E9; envers les animaux pr&amp;#x00E9;vus aux articles 521&amp;#x2011;1 &amp;#x00E0; 521&amp;#x2011;2 du code p&amp;#x00E9;nal. En effet, les &amp;#x00E9;tudes criminologiques&amp;nbsp;documentent un lien solide&amp;nbsp;entre actes de cruaut&amp;#x00E9; contre les animaux et atteintes envers les humains.&lt;/p&gt;</exposeSommaire>
+      <annexeExposeSommaire xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    </contenuAuteur>
+  </corps>
+  <cycleDeVie>
+    <dateDepot>2026-06-06</dateDepot>
+    <datePublication>2026-06-08</datePublication>
+    <soumisArticle40>false</soumisArticle40>
+    <etatDesTraitements>
+      <etat>
+        <code>DI</code>
+        <libelle>Discuté</libelle>
+      </etat>
+      <sousEtat>
+        <code>DI</code>
+        <libelle>Adopté</libelle>
+      </sousEtat>
+    </etatDesTraitements>
+    <dateSort>2026-06-09T21:44:33+02:00</dateSort>
+    <sort>Adopté</sort>
+  </cycleDeVie>
+  <representations>
+    <representation>
+      <nom>PDF</nom>
+      <typeMime>
+        <type>application</type>
+        <subType>PDF</subType>
+      </typeMime>
+      <statutRepresentation>
+        <verbatim>true</verbatim>
+        <canonique>true</canonique>
+        <officielle>true</officielle>
+        <transcription>false</transcription>
+        <enregistrement>false</enregistrement>
+      </statutRepresentation>
+      <repSource xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+      <offset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+      <contenu>
+        <documentURI>/base/AMANR5L17PO59051B2681P0D1N000368?format=pdf</documentURI>
+      </contenu>
+      <dateDispoRepresentation xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+    </representation>
+  </representations>
+  <seanceDiscussionRef xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+  <article99>false</article99>
+  <loiReference xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+  <discussionCommune>
+    <idDiscussion>39175</idDiscussion>
+    <typePosition>Premier</typePosition>
+  </discussionCommune>
+  <discussionIdentique xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true"/>
+  <accordGouvernementDepotHorsDelai>Sans objet</accordGouvernementDepotHorsDelai>
+</amendement>

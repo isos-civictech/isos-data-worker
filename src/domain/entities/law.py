@@ -41,10 +41,13 @@ PROCEDURE_TYPES: dict[str, LawType | None] = {
     "1": LawType.BILL,  # Projet de loi ordinaire
     "2": LawType.PROPOSITION,  # Proposition de loi ordinaire
     "3": LawType.BILL,  # Projet de loi de finances
+    "4": LawType.BILL,  # Projet de loi de financement de la sécurité sociale
     "5": None,  # organique
     "6": LawType.BILL,  # Ratification de traités
     "7": None,  # constitutionnelle
     "21": LawType.BILL,  # Loi de finances rectificative
+    "23": LawType.PROPOSITION,  # Proposition de loi, article 11 (référendum d'initiative partagée)
+    "33": LawType.BILL,  # Loi de règlement (résultats de la gestion)
 }
 
 
