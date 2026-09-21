@@ -1,4 +1,5 @@
 """The serving mapper's output IS the contract with public: assert the dict."""
+
 from datetime import date
 
 from src.infrastructure.persistence.serving.mappers.deputy_mapper import deputy_row, mandate_row

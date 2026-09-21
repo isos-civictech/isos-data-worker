@@ -1,4 +1,5 @@
 """Parsing tests against trimmed real AMO10 files. Assertions are on entities."""
+
 import io
 import zipfile
 from pathlib import Path
@@ -46,23 +47,22 @@ def storage() -> InMemoryStorage:
 
 def test_namespace_does_not_swallow_every_field():
     """Without namespace handling every field is silently None."""
-    deputy = AnDeputyAdapter._parse_acteur(
-        (FIXTURES / "acteur_PA1592.xml").read_bytes(), 17
-    )
+    deputy = AnDeputyAdapter._parse_acteur((FIXTURES / "acteur_PA1592.xml").read_bytes(), 17)
 
     assert deputy is not None
     assert deputy.uid == "PA1592"
     assert deputy.first_name == "Jean-Luc"
     assert deputy.last_name == "Mélenchon"
     assert deputy.profession == "Professeur"
-    assert str(deputy.photo_url) == "https://www2.assemblee-nationale.fr/static/tribun/17/photos/1592.jpg"
+    assert (
+        str(deputy.photo_url)
+        == "https://www2.assemblee-nationale.fr/static/tribun/17/photos/1592.jpg"
+    )
 
 
 def test_seat_and_group_come_from_two_different_mandat_nodes():
     """Seat data from the ASSEMBLEE mandat, group uid from the GP one."""
-    deputy = AnDeputyAdapter._parse_acteur(
-        (FIXTURES / "acteur_PA1592.xml").read_bytes(), 17
-    )
+    deputy = AnDeputyAdapter._parse_acteur((FIXTURES / "acteur_PA1592.xml").read_bytes(), 17)
     mandate = deputy.mandates[0]
 
     # from ASSEMBLEE
@@ -76,17 +76,13 @@ def test_seat_and_group_come_from_two_different_mandat_nodes():
 
 def test_closed_group_mandate_is_ignored():
     """A deputy who switched group has two GP mandats; only the open one counts."""
-    deputy = AnDeputyAdapter._parse_acteur(
-        (FIXTURES / "acteur_PA1592.xml").read_bytes(), 17
-    )
+    deputy = AnDeputyAdapter._parse_acteur((FIXTURES / "acteur_PA1592.xml").read_bytes(), 17)
     assert deputy.mandates[0].group_uid != "PO000000"
 
 
 def test_deputy_without_department_does_not_crash():
     """Deputies elected abroad have no department."""
-    deputy = AnDeputyAdapter._parse_acteur(
-        (FIXTURES / "acteur_PA9999.xml").read_bytes(), 17
-    )
+    deputy = AnDeputyAdapter._parse_acteur((FIXTURES / "acteur_PA9999.xml").read_bytes(), 17)
 
     assert deputy is not None
     assert deputy.gender == "F", '"Mme" must not be read as "M"'
@@ -135,9 +131,7 @@ async def test_raw_archive_is_kept_for_traceability(storage):
 @respx.mock
 async def test_archive_is_downloaded_once_for_both_passes(storage):
     """Groups then deputies: two passes, one download."""
-    route = respx.get(ARCHIVE_URL).mock(
-        return_value=httpx.Response(200, content=_archive())
-    )
+    route = respx.get(ARCHIVE_URL).mock(return_value=httpx.Response(200, content=_archive()))
 
     async with HttpClient() as http:
         adapter = AnDeputyAdapter(http, storage, BASE)

@@ -1,4 +1,5 @@
 """Route wiring and status codes; business logic is covered in tests/application."""
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -114,5 +115,9 @@ def test_every_trigger_route_is_exposed(client):
         "/project/deputies",
         "/sync/deputies",
         "/sync/deputies/{uid}",
+        "/collect/debates",
+        "/project/debates",
+        "/sync/debates",
+        "/sync/debates/{uid}",
     ):
         assert "post" in paths[route], f"{route} must be a POST"

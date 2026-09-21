@@ -5,6 +5,7 @@ Trigger routes — same use cases as the CLI, via the composition root.
   /project/…   raw -> public                       (SQL only)
   /sync/…      both, in order — what "fetch the deputies" means end to end
 """
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncEngine
 

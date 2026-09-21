@@ -1,20 +1,20 @@
 """
-Debate — one parliamentary sitting, made of ordered DebatePoints.
+Debate — one public sitting (séance), made of ordered DebatePoints.
 
 Source: Syceron XML
     ZIP: https://data.assemblee-nationale.fr/static/openData/repository/{legislature}/vp/syceronbrut/syseron.xml.zip
-    File pattern: CREANR5L{legislature}S{year}E{num}.xml
+    Members: xml/compteRendu/CRSANR5L{legislature}S{year}{O|E}{n}N{num}.xml
+             (O = ordinary session, E = extraordinary)
 
-XML field mapping:
-    uid            → compteRendu/uid
-    legislature    → compteRendu/legislature
-    session_number → compteRendu/numSeance
-    session_type   → compteRendu/typeSeance
-    date           → compteRendu/dateSeance   (tag name varies: DateSeance, date_seance…)
-    points         → compteRendu/pointsOrdreJour/point[]
-                    each point links to its interventions via pointODJRef
+XML field mapping (default namespace http://schemas.assemblee-nationale.fr/referentiel):
+    uid            → compteRendu/uid                          ("CRSANR5L17S2025O1N037")
+    legislature    → compteRendu/metadonnees/legislature
+    session_number → compteRendu/metadonnees/numSeance
+    date           → compteRendu/metadonnees/dateSeance     "20241106140000000" (%Y%m%d%H%M%S + ms)
+    title          → compteRendu/contenu/quantiemes/journee "Première séance du mercredi 06 …"
+    points         → compteRendu/contenu/point[] (nested via nivpoint)
 
-S3 path: raw/debates/{legislature}/{year}/{month}/{uid}.xml
+S3 key: raw/debates/{legislature}/syceron.xml.zip
 """
 
 from datetime import datetime
@@ -43,20 +43,16 @@ class Debate(BaseModel):
     session_number: int | None = None
     session_type: SessionType = SessionType.OTHER
     date: datetime
-
+    title: str | None = None
     points: list[DebatePoint] = []
-
     s3_key: str | None = None
 
-    # ── Computed ──────────────────────────────────────────────────────────────
     @computed_field
     @property
-    def law_references(self) -> list[str]:
-        """
-        All unique texte_refs values discussed in this debate.--
-        """
-        seen = set()
-        result = []
+    def texte_numbers(self) -> list[str]:
+        """Every text number (numéro de dépôt) discussed, in order, deduplicated."""
+        seen: set[str] = set()
+        result: list[str] = []
         for point in self.points:
             for ref in point.texte_refs:
                 if ref not in seen:
