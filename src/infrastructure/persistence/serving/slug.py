@@ -15,3 +15,13 @@ def slugify(text: str, max_length: int = 200) -> str:
 
 def deputy_slug(first_name: str, last_name: str) -> str:
     return slugify(f"{first_name} {last_name}")
+
+
+async def unique_slug(connection, table, slug: str, external_id: str) -> str:
+    """Append the uid when another row already owns this slug (homonyms, rescheduled sittings)."""
+    import sqlalchemy as sa
+
+    taken_by_other = await connection.execute(
+        sa.select(table.c.id).where(table.c.slug == slug, table.c.external_id != external_id)
+    )
+    return f"{slug}-{slugify(external_id)}" if taken_by_other.scalar() else slug
