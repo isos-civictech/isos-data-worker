@@ -11,14 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from src.application.use_cases.collect_agenda import CollectAgenda
 from src.application.use_cases.collect_debates import CollectDebates
 from src.application.use_cases.collect_deputies import CollectDeputies
+from src.application.use_cases.collect_laws import CollectLaws
 from src.application.use_cases.project_agenda import ProjectAgenda
 from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
+from src.application.use_cases.project_laws import ProjectLaws
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
 from src.infrastructure.adapters.an_agenda_adapter import AnAgendaAdapter
 from src.infrastructure.adapters.an_debate_adapter import AnDebateAdapter
 from src.infrastructure.adapters.an_deputy_adapter import AnDeputyAdapter
+from src.infrastructure.adapters.an_law_adapter import AnLawAdapter
 from src.infrastructure.http.client import HttpClient
 from src.infrastructure.persistence.engine import create_engine
 from src.infrastructure.persistence.raw.agenda_repository import SqlRawAgendaRepository
@@ -27,9 +30,11 @@ from src.infrastructure.persistence.raw.deputy_repository import SqlRawDeputyRep
 from src.infrastructure.persistence.raw.ingestion_log_repository import (
     SqlIngestionLogRepository,
 )
+from src.infrastructure.persistence.raw.law_repository import SqlRawLawRepository
 from src.infrastructure.persistence.serving.agenda_projection import SqlAgendaProjection
 from src.infrastructure.persistence.serving.debate_projection import SqlDebateProjection
 from src.infrastructure.persistence.serving.deputy_projection import SqlDeputyProjection
+from src.infrastructure.persistence.serving.law_projection import SqlLawProjection
 from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
 
 
@@ -122,3 +127,28 @@ async def build_collect_agenda(
 
 def build_project_agenda(engine: AsyncEngine) -> ProjectAgenda:
     return ProjectAgenda(projection=SqlAgendaProjection(engine))
+
+
+@asynccontextmanager
+async def build_collect_laws(
+    settings: Settings,
+    engine: AsyncEngine,
+    *,
+    dry_run: bool = False,
+) -> AsyncIterator[CollectLaws]:
+    storage = build_storage(settings)
+    async with HttpClient(
+        # ~37 MB archive.
+        timeout_s=max(settings.http_timeout_s, 120.0),
+        max_attempts=settings.http_max_attempts,
+    ) as http:
+        yield CollectLaws(
+            source=AnLawAdapter(http, storage, settings.an_base_url),
+            repository=SqlRawLawRepository(engine),
+            log_repository=SqlIngestionLogRepository(engine),
+            dry_run=dry_run,
+        )
+
+
+def build_project_laws(engine: AsyncEngine) -> ProjectLaws:
+    return ProjectLaws(projection=SqlLawProjection(engine))

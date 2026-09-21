@@ -65,6 +65,10 @@ _PAGE = """<!doctype html>
         <b>à venir</b> — mêmes options</td></tr>
     <tr><td>GET /agenda/today</td><td>ce qui est à l'ordre du jour aujourd'hui</td></tr>
     <tr><td>GET /agenda/upcoming</td><td>les prochaines séances</td></tr>
+    <tr><td>POST /sync/laws</td><td>les dossiers législatifs : projets et propositions de
+        loi, leurs lectures, et le lien <code>debate_law</code> vers les séances —
+        à lancer <b>après</b> l'agenda</td></tr>
+    <tr><td>GET /laws/{uid}</td><td>un dossier (DLR…) et ses étapes, tel que collecté</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>

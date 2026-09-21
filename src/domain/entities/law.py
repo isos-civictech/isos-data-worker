@@ -1,85 +1,119 @@
 """
-Law entity — represents a legislative dossier (the Series in our Netflix metaphor).
+Law entity — one legislative dossier ("dossier législatif").
 
 Sources:
-    ZIP JSON: https://data.assemblee-nationale.fr/static/openData/repository/
-                {legislature}/loi/dossiers_legislatifs/Dossiers_Legislatifs.json.zip
-    Portal  : https://data.assemblee-nationale.fr/travaux-parlementaires/dossiers-legislatifs
+    ZIP JSON: {base}/static/openData/repository/{legislature}/loi/dossiers_legislatifs/
+              Dossiers_Legislatifs.json.zip
+              (~37 MB, json/dossierParlementaire/DLR*.json + json/document/*, ignored)
+    Portal  : https://www.assemblee-nationale.fr/dyn/{legislature}/dossiers/{dossier_uid}
 
 JSON field mapping (root key: dossierParlementaire):
-    dossier_uid    → dossierParlementaire/uid
-    legislature    → dossierParlementaire/legislature
-    title          → dossierParlementaire/titreDossier/titre
-    law_type       → dossierParlementaire/procedureParlementaire/code
-    texte_uid      → found by adapter inside actesLegislatifs tree via texteAssocie
+    dossier_uid      → uid                              "DLR5L17N53940"
+    legislature      → legislature                      "17"
+    title            → titreDossier/titre
+    senate_url       → titreDossier/senatChemin
+    procedure_code   → procedureParlementaire/code      "1" projet, "2" proposition, "19" rapport…
+    procedure_label  → procedureParlementaire/libelle
+    initiator_uids   → initiateur/acteurs/acteur[]/acteurRef   (dict when single, list otherwise)
+    stages           → actesLegislatifs/acteLegislatif[] at depth 1 (see legislative_stage.py)
 
-    stages         → actesLegislatifs tree (RECURSIVE — see adapter)
-                    ⚠️ acteLegislatif is a DICT if 1 acte, a LIST if multiple
-
-    initiateur:
-        if acteurs/acteur/acteurRef present → deputy proposer (acteurRef = PA...)
-        if null or organe only             → government bill
-
+Not every dossier is a law: résolutions (8, 22), rapports (19), missions
+(9, 10) share the same file. `is_law` tells them apart.
 """
 
+from datetime import date
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
-from src.domain.entities.legislative_stage import LegislativeStage
+from src.domain.entities.legislative_stage import PROMULGATION_CODE, LegislativeStage
 from src.domain.shared.validators import Legislature, NotBlankStr
 
 
 class LawType(StrEnum):
-    """
-    procedureParlementaire/code values from real DLR files.
-    ⚠️ Complete this enum as more codes are discovered.
-    """
+    BILL = "bill"  # projet de loi (government)
+    PROPOSITION = "proposition"  # proposition de loi (members)
 
-    ORDINARY_MEMBER_BILL = "2"  # ordinary member bill
-    INFORMATION_REPORT = "19"  # information report
-    LAW_PROJECT = "1"  # government bill --- TO BE CONFIRMED
-    OTHER = "0"  # fallback for unknown codes
+
+# procedureParlementaire/code -> type. Codes 5 and 7 ("projet OU proposition"
+# organique / constitutionnelle) are decided by the title.
+PROCEDURE_TYPES: dict[str, LawType | None] = {
+    "1": LawType.BILL,  # Projet de loi ordinaire
+    "2": LawType.PROPOSITION,  # Proposition de loi ordinaire
+    "3": LawType.BILL,  # Projet de loi de finances
+    "5": None,  # organique
+    "6": LawType.BILL,  # Ratification de traités
+    "7": None,  # constitutionnelle
+    "21": LawType.BILL,  # Loi de finances rectificative
+}
 
 
 class LawStatus(StrEnum):
-    IN_PROGRESS = "en cours d'examen"
-    ADOPTED = "adopté"
-    REJECTED = "rejeté"
-    WITHDRAWN = "retiré"
+    SUBMITTED = "submitted"
+    IN_DISCUSSION = "in_discussion"
+    ADOPTED = "adopted"
+    REJECTED = "rejected"
+    PROMULGATED = "promulgated"
+    WITHDRAWN = "withdrawn"
 
 
 class Law(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        from_attributes=True,
-    )
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
     dossier_uid: NotBlankStr
-    texte_uid: NotBlankStr | None = None
     legislature: Legislature
     title: NotBlankStr
-    law_type: LawType
-    initiateur_uid: str | None = None  # "PA775234" if deputy, None if government/null
+    senate_url: str | None = None
+    procedure_code: NotBlankStr
+    procedure_label: str | None = None
+    initiator_uids: list[str] = []
+    withdrawn: bool = False  # an AN1-RTRINI / ANLUNI-RTRINI act exists
     stages: list[LegislativeStage] = []
-    closure_status: LawStatus | None = None
+    s3_key: str | None = None
 
     @computed_field
     @property
-    def status(self) -> LawStatus:
-        if self.closure_status is not None:
-            return self.closure_status
-        if self.is_promulgated:
-            return LawStatus.ADOPTED
-        return LawStatus.IN_PROGRESS
+    def is_law(self) -> bool:
+        return self.procedure_code in PROCEDURE_TYPES
 
     @computed_field
     @property
-    def current_stage(self) -> LegislativeStage | None:
-        reached = [s for s in self.stages if s.updated_stage_date is not None]
-        return reached[-1] if reached else None
+    def law_type(self) -> LawType | None:
+        if not self.is_law:
+            return None
+        fixed = PROCEDURE_TYPES[self.procedure_code]
+        if fixed is not None:
+            return fixed
+        return LawType.BILL if self.title.lower().startswith("projet") else LawType.PROPOSITION
+
+    @computed_field
+    @property
+    def texte_uid(self) -> str | None:
+        """Uid of the first deposited text."""
+        return next((s.texte_uid for s in self.stages if s.texte_uid), None)
+
+    @computed_field
+    @property
+    def deposited_at(self) -> date | None:
+        return next((s.started_at for s in self.stages if s.started_at), None)
 
     @computed_field
     @property
     def is_promulgated(self) -> bool:
-        return any(s.code == "PROM" and s.updated_stage_date is not None for s in self.stages)
+        return any(s.code == PROMULGATION_CODE and s.concluded_at for s in self.stages)
+
+    @computed_field
+    @property
+    def status(self) -> LawStatus:
+        if self.is_promulgated:
+            return LawStatus.PROMULGATED
+        if self.withdrawn:
+            return LawStatus.WITHDRAWN
+        decided = [s for s in self.stages if s.is_reading and s.decision_code]
+        if decided and decided[-1].rejected:
+            return LawStatus.REJECTED
+        if decided and decided[-1].code == "ANLDEF":
+            return LawStatus.ADOPTED
+        if any(s.examined_at for s in self.stages):
+            return LawStatus.IN_DISCUSSION
+        return LawStatus.SUBMITTED

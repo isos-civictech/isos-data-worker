@@ -13,10 +13,12 @@ from src.composition import (
     build_collect_agenda,
     build_collect_debates,
     build_collect_deputies,
+    build_collect_laws,
     build_engine,
     build_project_agenda,
     build_project_debates,
     build_project_deputies,
+    build_project_laws,
 )
 from src.config import get_settings
 from src.domain.shared.results import SyncReport
@@ -85,6 +87,26 @@ async def _project_agenda(args) -> SyncReport:
         await engine.dispose()
 
 
+async def _collect_laws(args) -> SyncReport:
+    settings = get_settings()
+    engine = build_engine(settings)
+    try:
+        async with build_collect_laws(settings, engine, dry_run=args.dry_run) as use_case:
+            if args.uid:
+                return await use_case.execute_one(args.uid, args.legislature)
+            return await use_case.execute(args.legislature, limit=args.limit)
+    finally:
+        await engine.dispose()
+
+
+async def _project_laws(args) -> SyncReport:
+    engine = build_engine(get_settings())
+    try:
+        return await build_project_laws(engine).execute(args.legislature)
+    finally:
+        await engine.dispose()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="isos-data-worker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -136,6 +158,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     project_a.add_argument("--legislature", type=int, default=None)
     project_a.set_defaults(handler=_project_agenda)
+
+    collect_l = sub.add_parser("collect-laws", help="Assemblée nationale → raw.law")
+    collect_l.add_argument("--legislature", type=int, default=None)
+    collect_l.add_argument("--limit", type=int, default=None, help="stop after N dossiers")
+    collect_l.add_argument("--uid", default=None, help="replay a single dossier (DLR…)")
+    collect_l.add_argument("--dry-run", action="store_true")
+    collect_l.set_defaults(handler=_collect_laws)
+
+    project_l = sub.add_parser(
+        "project-laws", help="raw.law → public.law, law_reading, debate_law (no network)"
+    )
+    project_l.add_argument("--legislature", type=int, default=None)
+    project_l.set_defaults(handler=_project_laws)
 
     return parser
 

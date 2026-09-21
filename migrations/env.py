@@ -5,6 +5,7 @@ Alembic for the `raw` schema.
   * `version_table_schema="raw"` puts our `alembic_version` table inside our own
     schema, so the two migration histories never collide.
 """
+
 import asyncio
 from logging.config import fileConfig
 
