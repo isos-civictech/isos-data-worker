@@ -1,46 +1,50 @@
 """
-AgendaItem — a planned or ongoing parliamentary session.
+AgendaItem — one public sitting (séance publique) as scheduled by the Assemblée.
+
+It exists BEFORE the sitting happens, which is what makes "what is on today"
+and "upcoming sittings" possible. Once the sitting has taken place, its
+compte rendu (Debate) is linked through `debate_uid`.
 
 Source: Agenda XML
-    ZIP : https://data.assemblee-nationale.fr/static/openData/repository/
-        {legislature}/vp/reunions/Agenda.xml.zip
-    JSON: same path with .json.zip extension
-    Public sessions CSV:
-        https://data.assemblee-nationale.fr/static/openData/repository/
-        {legislature}/vp/seances/seances_publique_libre_office.csv
+    ZIP: https://data.assemblee-nationale.fr/static/openData/repository/{legislature}/vp/reunions/Agenda.xml.zip
+    Members: xml/reunion/RUANR5L{legislature}S{year}IDS{n}.xml
+             Only xsi:type="seance_type" with a RUAN uid (Assemblée). The same
+             archive holds commissions (IDC), parliamentary initiatives (IDFL)
+             and Sénat sittings (RUSN); all are skipped.
 
-XML field mapping :
-    uid          → reunion/uid
-    legislature  → derived from URL / settings
-    start_date   → reunion/timestampDebut
-    end_date     → reunion/timestampFin
-    location     → reunion/lieu/salle
-    meeting_type → reunion/xsiType
-    title        → reunion/libelle
-    text_refs    → reunion/odj/pointOdj[]/texte/textesAssocies/texteAssocie/texteRef
+XML field mapping (default namespace http://schemas.assemblee-nationale.fr/referentiel):
+    uid            → reunion/uid                       ("RUANR5L17S2024IDS28538")
+    start_at       → reunion/timeStampDebut            ISO 8601 with offset
+    end_at         → reunion/timeStampFin
+    location       → reunion/lieu/libelleLong
+    state          → reunion/cycleDeVie/etat           "Confirmé" | "Supprimé"
+    debate_uid     → reunion/compteRenduRef            ("CRSANR5L17S2024D1N002"), absent until held
+    session_rank   → reunion/identifiants/quantieme    "Première" | "Deuxième" | "Unique"…
+    session_number → reunion/identifiants/numSeanceJO
+    points         → reunion/ODJ/pointsODJ/pointODJ[]
 
-Lifecycle:
-    status = SCHEDULED ("prévue")   → session not yet started
-    status = ONGOING ("en cours")   → session in progress (start_date passed, end_date not yet)
-    status = COMPLETED ("terminée") → session ended, Syceron XML should be available soon
-    status = CANCELLED ("annulée")  → session was cancelled before taking place
-
-S3 path: raw/agenda/{legislature}/{year}/{month}/Agenda.xml.zip (full ZIP)
+S3 key: raw/agenda/{legislature}/Agenda.xml.zip
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 
+from src.domain.entities.agenda_point import AgendaPoint
 from src.domain.shared.validators import Legislature, NotBlankStr
+
+CANCELLED_STATE = "Supprimé"
+# A sitting with no end time is over once this much time has passed since it
+# started: no sitting lasts a full day.
+MAX_SITTING_DURATION = timedelta(hours=12)
 
 
 class SessionStatus(StrEnum):
-    SCHEDULED = "prévue"
-    ONGOING = "en cours"
-    COMPLETED = "terminée"
-    CANCELLED = "annulée"
+    SCHEDULED = "scheduled"
+    ONGOING = "ongoing"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class AgendaItem(BaseModel):
@@ -51,32 +55,43 @@ class AgendaItem(BaseModel):
 
     uid: NotBlankStr
     legislature: Legislature
-    start_date: datetime = Field(alias="date_debut")
-    end_date: datetime | None = Field(default=None, alias="date_fin")
-    title: str | None = None
-    location: str | None = Field(default=None, alias="lieu")
-    meeting_type: str | None = Field(default=None, alias="type_reunion")
-    text_refs: list[str] = Field(default_factory=list, alias="texte_refs")
+    start_at: datetime
+    end_at: datetime | None = None
+    location: str | None = None
+    state: str | None = None
     debate_uid: str | None = None
-    cancelled: bool = False
+    session_rank: str | None = None
+    session_number: int | None = None
+    points: list[AgendaPoint] = []
+
+    @computed_field
+    @property
+    def cancelled(self) -> bool:
+        return self.state == CANCELLED_STATE
 
     @computed_field
     @property
     def status(self) -> SessionStatus:
+        """Where the sitting stands right now — the value public.calendar_status wants."""
         if self.cancelled:
             return SessionStatus.CANCELLED
         now = datetime.now(tz=UTC)
-        start = self.start_date if self.start_date.tzinfo else self.start_date.replace(tzinfo=UTC)
-        end = None
-        if self.end_date:
-            end = self.end_date if self.end_date.tzinfo else self.end_date.replace(tzinfo=UTC)
-        if now < start:
+        if now < self.start_at:
             return SessionStatus.SCHEDULED
-        if end and now > end:
+        if self.debate_uid:
             return SessionStatus.COMPLETED
-        return SessionStatus.ONGOING
+        end = self.end_at or self.start_at + MAX_SITTING_DURATION
+        return SessionStatus.COMPLETED if now > end else SessionStatus.ONGOING
 
     @computed_field
     @property
-    def is_ready_to_scrape(self) -> bool:
-        return self.status == SessionStatus.COMPLETED and self.debate_uid is None
+    def dossier_refs(self) -> list[str]:
+        """Every law dossier on the agenda, in order, deduplicated."""
+        seen: set[str] = set()
+        out: list[str] = []
+        for point in self.points:
+            for ref in point.dossier_refs:
+                if ref not in seen:
+                    seen.add(ref)
+                    out.append(ref)
+        return out

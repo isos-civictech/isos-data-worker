@@ -8,21 +8,26 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from src.application.use_cases.collect_agenda import CollectAgenda
 from src.application.use_cases.collect_debates import CollectDebates
 from src.application.use_cases.collect_deputies import CollectDeputies
+from src.application.use_cases.project_agenda import ProjectAgenda
 from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
+from src.infrastructure.adapters.an_agenda_adapter import AnAgendaAdapter
 from src.infrastructure.adapters.an_debate_adapter import AnDebateAdapter
 from src.infrastructure.adapters.an_deputy_adapter import AnDeputyAdapter
 from src.infrastructure.http.client import HttpClient
 from src.infrastructure.persistence.engine import create_engine
+from src.infrastructure.persistence.raw.agenda_repository import SqlRawAgendaRepository
 from src.infrastructure.persistence.raw.debate_repository import SqlRawDebateRepository
 from src.infrastructure.persistence.raw.deputy_repository import SqlRawDeputyRepository
 from src.infrastructure.persistence.raw.ingestion_log_repository import (
     SqlIngestionLogRepository,
 )
+from src.infrastructure.persistence.serving.agenda_projection import SqlAgendaProjection
 from src.infrastructure.persistence.serving.debate_projection import SqlDebateProjection
 from src.infrastructure.persistence.serving.deputy_projection import SqlDeputyProjection
 from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
@@ -94,3 +99,26 @@ async def build_collect_debates(
 
 def build_project_debates(engine: AsyncEngine) -> ProjectDebates:
     return ProjectDebates(projection=SqlDebateProjection(engine))
+
+
+@asynccontextmanager
+async def build_collect_agenda(
+    settings: Settings,
+    engine: AsyncEngine,
+    *,
+    dry_run: bool = False,
+) -> AsyncIterator[CollectAgenda]:
+    storage = build_storage(settings)
+    async with HttpClient(
+        timeout_s=settings.http_timeout_s, max_attempts=settings.http_max_attempts
+    ) as http:
+        yield CollectAgenda(
+            source=AnAgendaAdapter(http, storage, settings.an_base_url),
+            repository=SqlRawAgendaRepository(engine),
+            log_repository=SqlIngestionLogRepository(engine),
+            dry_run=dry_run,
+        )
+
+
+def build_project_agenda(engine: AsyncEngine) -> ProjectAgenda:
+    return ProjectAgenda(projection=SqlAgendaProjection(engine))

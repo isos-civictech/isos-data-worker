@@ -250,3 +250,46 @@ intervention = sa.Table(
     sa.Column("order_in_debate", sa.Integer),
     sa.Index("ix_raw_intervention_point", "debate_point_id"),
 )
+
+
+# ── Agenda ────────────────────────────────────────────────────────────────────
+
+# One public sitting as scheduled. Exists before the sitting happens; once held,
+# compte_rendu_uid points at raw.debate.uid.
+agenda_item = sa.Table(
+    "agenda_item",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "RUANR5L17S2024IDS28538"
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("start_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("end_at", sa.DateTime(timezone=True)),
+    sa.Column("location", sa.Text),
+    sa.Column("state", sa.String(50)),  # "Confirmé" | "Supprimé"
+    sa.Column("compte_rendu_uid", sa.String(100)),  # -> raw.debate.uid, once held
+    sa.Column("session_rank", sa.String(20)),  # "Première" | "Deuxième" | "Unique"
+    sa.Column("session_number", sa.Integer),
+    *_seen_columns(),
+    sa.Index("ix_raw_agenda_item_start", "start_at"),
+    sa.Index("ix_raw_agenda_item_cr", "compte_rendu_uid"),
+)
+
+agenda_point = sa.Table(
+    "agenda_point",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "agenda_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.agenda_item.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("point_uid", sa.String(100), nullable=False, unique=True),
+    sa.Column("title", sa.Text),
+    sa.Column("kind", sa.String(100)),  # typePointODJ
+    sa.Column("state", sa.String(50)),
+    sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+    # Law dossier uids ("DLR5L17N53818"): the clean debate -> law join.
+    sa.Column("dossier_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_agenda_point_agenda", "agenda_uid"),
+)

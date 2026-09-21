@@ -119,5 +119,15 @@ def test_every_trigger_route_is_exposed(client):
         "/project/debates",
         "/sync/debates",
         "/sync/debates/{uid}",
+        "/collect/agenda",
+        "/project/agenda",
+        "/sync/agenda",
     ):
         assert "post" in paths[route], f"{route} must be a POST"
+
+
+def test_agenda_read_routes(client):
+    for route in ("/agenda/today", "/agenda/upcoming"):
+        response = client.get(route)
+        assert response.status_code == 200, route
+        assert response.json() == []

@@ -23,6 +23,7 @@ from src.infrastructure.persistence.serving.mappers.deputy_mapper import (
     mandate_row,
     political_group_row,
 )
+from src.infrastructure.persistence.serving.slug import unique_slug
 
 # The 17th legislature opened on 2024-07-18; earlier ones are not collected.
 LEGISLATURE_START = {17: date(2024, 7, 18)}
@@ -65,16 +66,6 @@ async def _upsert_by_external_id(
         updates["updated_at"] = sa.func.now()
     await connection.execute(sa.update(table).where(table.c.id == existing).values(**updates))
     return existing, False
-
-
-async def _unique_slug(connection: AsyncConnection, slug: str, external_id: str) -> str:
-    """Two deputies with the same name: the second one gets its uid appended."""
-    taken_by_other = await connection.execute(
-        sa.select(pub.deputy.c.id).where(
-            pub.deputy.c.slug == slug, pub.deputy.c.external_id != external_id
-        )
-    )
-    return f"{slug}-{external_id.lower()}" if taken_by_other.scalar() else slug
 
 
 class SqlDeputyProjection(DeputyProjection):
@@ -142,7 +133,7 @@ class SqlDeputyProjection(DeputyProjection):
         self, connection: AsyncConnection, deputy, mandate, legislature_id: int, group_ids: dict
     ) -> bool:
         row = deputy_row(deputy, mandate)
-        row["slug"] = await _unique_slug(connection, row["slug"], row["external_id"])
+        row["slug"] = await unique_slug(connection, pub.deputy, row["slug"], row["external_id"])
         deputy_id, created = await _upsert_by_external_id(
             connection, pub.deputy, row, write_once=("slug",)
         )
