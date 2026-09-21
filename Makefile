@@ -1,7 +1,8 @@
 # isos-data-worker — everyday commands. `make` alone lists them.
 #
 #   make sync DEBATES=5     the 5 latest sittings and everything they touch (deputies: all)
-#   make sync               the whole legislature (amendments: 340 MB, ~15 min)
+#   make sync               the whole legislature, from the archives already in S3
+#   make sync REFRESH=1     same, but re-download the archives first (the weekly update)
 #   make collect DS=laws    one dataset, Assemblée → raw       make project DS=laws   raw → public
 #   make refresh            re-download the archives into S3
 
@@ -10,6 +11,7 @@ CLI   := uv run python -m src.interfaces.cli
 LEG   ?= 17
 DS    ?= deputies
 DEBATES ?=
+REFRESH ?=
 
 .DEFAULT_GOAL := help
 
@@ -18,8 +20,8 @@ help: ## list the commands
 
 # ── run ───────────────────────────────────────────────────────────────────────
 
-sync: ## collect + project everything; DEBATES=N scopes to the N latest sittings
-	$(CLI) --legislature $(LEG) sync-all $(if $(DEBATES),--debates $(DEBATES))
+sync: ## collect + project everything; DEBATES=N scopes to the N latest sittings; REFRESH=1 re-downloads
+	$(CLI) --legislature $(LEG) $(if $(REFRESH),--refresh) sync-all $(if $(DEBATES),--debates $(DEBATES))
 
 collect: ## Assemblée → raw for one dataset (DS=deputies|laws|agenda|debates|amendments|ballots|law-texts)
 	$(CLI) --legislature $(LEG) collect-$(DS) $(ARGS)
