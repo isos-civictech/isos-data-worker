@@ -38,8 +38,7 @@ Onze fichiers, un par notion. Ce sont des modèles Pydantic v2 : ils valident ce
 | `mandate.py` | son mandat dans une législature | `is_active` calculé depuis la date de fin |
 | `political_group.py` | un groupe politique | ajouté en J1 : il manquait |
 | `law.py` | un dossier législatif | `status`, `current_stage`, `is_promulgated` calculés depuis les étapes |
-| `legislative_stage.py` | une étape de la navette | |
-| `law_article.py` | le texte d'un article | c'est lui qu'on versionne |
+| `legislative_stage.py` | une phase de la navette (lecture, CMP, promulgation) | dates et décision résumées |
 | `debate.py` | une séance | contient ses points |
 | `debate_point.py` | un point d'ordre du jour | **le niveau « sujet »** |
 | `intervention.py` | une prise de parole | |
@@ -180,7 +179,7 @@ Aujourd'hui, `domain/` est presque seul : seuls les tests l'utilisent. Voilà qu
 | `CollectDeputies` | J3 | orchestre les deux, renvoie un `SyncReport` |
 | `SqlDeputyProjection` | J3 | implémente `DeputyProjection` |
 | Routes FastAPI + CLI | J3 | déclenchent les cas d'usage |
-| `AnLawAdapter`, versionnement | J4 | `LawSource`, `LawRepository` |
+| `AnLawAdapter` | J4 | `LawSource`, `LawRepository` |
 | `AnDebateAdapter` | J5 | `DebateSource`, `DebateRepository` |
 
 Remarque le sens : **rien de tout ça n'obligera à modifier le domaine.** Si l'un de ces travaux demande de changer une entité ou un port, c'est le signal qu'on a mal compris quelque chose — et ça vaut la peine de s'arrêter pour en parler.
