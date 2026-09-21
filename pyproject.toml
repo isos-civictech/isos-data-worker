@@ -45,6 +45,8 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Markdown code blocks in docs/ are prose, not code to format.
+exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

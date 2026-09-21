@@ -52,8 +52,8 @@ _PAGE = """<!doctype html>
   <h2>Déclencher</h2>
   <table>
     <tr><td>POST /sync/all</td><td><b>tout, dans l'ordre</b> : députés, agenda, débats, lois,
-        amendements, textes, scrutins — puis projection. <code>?debates=5</code> se limite aux
-        5 dernières séances et à ce qu'elles touchent (les députés sont toujours tous pris)</td></tr>
+        amendements, textes, scrutins — puis projection. <code>?debates=5</code> se limite
+        aux 5 dernières séances et à ce qu'elles touchent (les députés : toujours tous)</td></tr>
     <tr><td>POST /sync/{dataset}</td><td>un jeu, collecte puis projection —
         <code>deputies laws agenda debates amendments ballots law-texts</code></td></tr>
     <tr><td>POST /collect/{dataset}</td><td>Assemblée → raw seulement. Options
