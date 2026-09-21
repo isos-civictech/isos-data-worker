@@ -254,7 +254,7 @@ law_article = sa.Table(
     sa.Column("position", sa.Integer, nullable=False),
     sa.Column("section", sa.Text),
     sa.Column("content", sa.Text),  # alinéas, one per line
-    sa.Column("mention", sa.String(50)),  # Supprimé | Non modifié | Conforme…
+    sa.Column("mention", sa.Text),  # Supprimé | Non modifié | Conforme… (sometimes a sentence)
     sa.UniqueConstraint("texte_uid", "position", name="uq_raw_law_article"),
     sa.Index("ix_raw_law_article_ref", "texte_uid", "article_ref"),
 )

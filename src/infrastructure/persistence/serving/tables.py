@@ -185,6 +185,6 @@ law_article = sa.Table(
     sa.Column("position", sa.Integer, nullable=False),
     sa.Column("section", sa.String(255)),
     sa.Column("content", sa.Text),
-    sa.Column("mention", sa.String(50)),
+    sa.Column("mention", sa.Text),
     sa.Column("is_new", sa.Boolean, nullable=False),
 )
