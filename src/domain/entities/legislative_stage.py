@@ -1,28 +1,69 @@
 """
-LegislativeStage entity — one step in the parliamentary shuttle.
+LegislativeStage — one top-level phase of a dossier's parliamentary journey.
 
-Known stage codes (non-exhaustive list):
-    SN1-DEPOT           → 1er dépôt d'une initiative (Sénat)
-    SN1-COM             → Travaux des commissions (Sénat)
-    SN1-COM-FOND        → Travaux de la commission saisie au fond
-    SN1-COM-FOND-SAISIE → Renvoi en commission au fond
-    AN20-RAPPORT        → Dépôt de rapport
-    PROM                → Promulgation
+Source: `actesLegislatifs/acteLegislatif` at depth 1 of a dossier
+(see law.py). Each top-level acte is a phase (a reading in one chamber, the
+CMP, the Conseil constitutionnel, the promulgation) and nests the detailed
+acts (dépôt, commission, séance, décision) underneath it.
+
+JSON field mapping (one depth-1 acteLegislatif):
+    uid           → uid                          "DLR5L17N53940-AN1"
+    code          → codeActe                     "AN1", "SN1", "CMP", "CC", "PROM", "AN20"…
+    label         → libelleActe/nomCanonique     "1ère lecture (2ème assemblée saisie)"
+    organe_ref    → organeRef                    "PO838901" (AN), "PO78718" (Sénat)
+    order         → position in the list
+    Derived from the nested acts (any depth):
+    started_at    → earliest dateActe (usually the dépôt)
+    examined_at   → earliest dateActe of a *-REUNION, *-RAPPORT, *-SEANCE or *-DEC act:
+                    the moment the chamber actually starts working on the text
+    concluded_at  → dateActe of the *-DEC / PROM-PUB act
+    decision      → statutConclusion/libelle of that act   "adopté", "rejeté", "modifié"
+    decision_code → statutConclusion/fam_code               "TSORTF01", "TSORTF07"…
+    texte_uid     → texteAssocie of the *-DEPOT act         "PRJLANR5L17B2681"
+    sitting_refs  → reunionRef of *-DEBATS-SEANCE acts      "RUANR5L17S2026IDS30781"
+                    (= agenda uid = public.debate.external_id)
 """
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from src.domain.shared.validators import NotBlankStr
 
+# Stage codes that are a reading of a text (public.law_reading); the rest
+# (CC, PROM, AN20 "travaux", AN21 motion de censure…) are not.
+READING_CODES = {
+    "AN1", "AN2", "ANNLEC", "ANLDEF", "ANLUNI",
+    "SN1", "SN2", "SNNLEC", "SNLDEF", "SNLUNI",
+    "CMP",
+}  # fmt: skip
+
+REJECTED_CODES = {"TSORTF07", "TMRC01"}
+PROMULGATION_CODE = "PROM"
+
 
 class LegislativeStage(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        from_attributes=True,
-    )
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
+    uid: NotBlankStr
     code: NotBlankStr
     label: NotBlankStr
-    updated_stage_date: date | None = None
+    organe_ref: str | None = None
+    order: int = 0
+    started_at: date | None = None
+    examined_at: date | None = None
+    concluded_at: date | None = None
+    decision: str | None = None
+    decision_code: str | None = None
+    texte_uid: str | None = None
+    sitting_refs: list[str] = []
+
+    @computed_field
+    @property
+    def is_reading(self) -> bool:
+        return self.code in READING_CODES
+
+    @computed_field
+    @property
+    def rejected(self) -> bool:
+        return self.decision_code in REJECTED_CODES

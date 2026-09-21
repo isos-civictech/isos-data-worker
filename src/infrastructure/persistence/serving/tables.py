@@ -73,3 +73,40 @@ debate = sa.Table(
     sa.Column("external_id", sa.String(100)),
     sa.Column("updated_at", sa.DateTime(timezone=True)),
 )
+
+law = sa.Table(
+    "law",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("legislature_id", sa.Integer, nullable=False),
+    sa.Column("type", pg.ENUM(name="law_type", create_type=False), nullable=False),
+    sa.Column("name", sa.String(255), nullable=False),  # short, truncated
+    sa.Column("title", sa.Text),  # full dossier title
+    sa.Column("slug", sa.Text, nullable=False),
+    sa.Column("status", pg.ENUM(name="law_status", create_type=False), nullable=False),
+    sa.Column("deposited_at", sa.DateTime(timezone=True)),
+    sa.Column("source_url", sa.Text),
+    sa.Column("external_id", sa.String(100)),
+    sa.Column("updated_at", sa.DateTime(timezone=True)),
+)
+
+law_reading = sa.Table(
+    "law_reading",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("law_id", sa.Integer, nullable=False),
+    sa.Column("chamber", pg.ENUM(name="reading_chamber", create_type=False), nullable=False),
+    sa.Column("reading_number", sa.Integer, nullable=False),
+    sa.Column("status", pg.ENUM(name="law_status", create_type=False), nullable=False),
+    sa.Column("calendar_status", pg.ENUM(name="event_status", create_type=False), nullable=False),
+    sa.Column("started_at", sa.Date),
+    sa.Column("concluded_at", sa.Date),
+)
+
+debate_law = sa.Table(
+    "debate_law",
+    metadata,
+    sa.Column("debate_id", sa.Integer, primary_key=True),
+    sa.Column("law_id", sa.Integer, primary_key=True),
+    sa.Column("law_reading_id", sa.Integer),
+)

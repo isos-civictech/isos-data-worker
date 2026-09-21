@@ -135,65 +135,47 @@ law = sa.Table(
     "law",
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
-    sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N47390"
-    # Join key for debates, which reference texte uids.
-    sa.Column("texte_uid", sa.String(100)),
+    sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N53940"
     sa.Column("legislature", sa.Integer, nullable=False),
     # Never truncated here.
     sa.Column("title", sa.Text, nullable=False),
-    sa.Column("law_type", sa.String(50)),
-    sa.Column("initiateur_uid", sa.String(100)),
-    sa.Column("closure_status", sa.String(50)),
+    sa.Column("senate_url", sa.Text),
+    # procedureParlementaire: "1" projet, "2" proposition, "19" rapport, "8" résolution…
+    sa.Column("procedure_code", sa.String(10), nullable=False),
+    sa.Column("procedure_label", sa.Text),
+    # Deputies (PA…) who signed the initiative; empty for government texts.
+    sa.Column("initiator_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("withdrawn", sa.Boolean, nullable=False, server_default=sa.false()),
     *_seen_columns(),
-    sa.Index("ix_raw_law_texte_uid", "texte_uid"),
 )
 
+# One row per top-level acte: a reading in a chamber, the CMP, the CC, the
+# promulgation. The nested acts are summarised into dates and a decision.
 law_stage = sa.Table(
     "law_stage",
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("stage_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N53940-AN1"
     sa.Column(
         "dossier_uid",
         sa.String(100),
         sa.ForeignKey("raw.law.dossier_uid", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("code", sa.String(50), nullable=False),
+    sa.Column("code", sa.String(50), nullable=False),  # "AN1", "SN1", "CMP", "PROM"…
     sa.Column("label", sa.Text, nullable=False),
-    sa.Column("updated_stage_date", sa.Date),
+    sa.Column("organe_ref", sa.String(100)),
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
-    sa.UniqueConstraint("dossier_uid", "code", "position", name="uq_raw_law_stage"),
+    sa.Column("started_at", sa.Date),
+    sa.Column("examined_at", sa.Date),
+    sa.Column("concluded_at", sa.Date),
+    sa.Column("decision", sa.Text),  # "adopté", "rejeté", "modifié"
+    sa.Column("decision_code", sa.String(20)),  # "TSORTF01", "TSORTF07"…
+    sa.Column("texte_uid", sa.String(100)),  # text deposited for this reading
+    # Agenda uids of the public sittings (RUAN… / RUSN…): the law -> debate join.
+    sa.Column("sitting_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_law_stage_dossier", "dossier_uid"),
 )
-
-# Versioned: a changed text inserts a new row, the old one gets is_current=false.
-law_article = sa.Table(
-    "law_article",
-    metadata,
-    sa.Column("id", sa.BigInteger, primary_key=True),
-    sa.Column("texte_uid", sa.String(100), nullable=False),
-    sa.Column("article_ref", sa.String(100), nullable=False),
-    sa.Column("article_number", sa.Integer),
-    sa.Column("legislature", sa.Integer, nullable=False),
-    sa.Column("content", sa.Text, nullable=False),
-    sa.Column("content_checksum", sa.String(64), nullable=False),
-    sa.Column("version_number", sa.Integer, nullable=False, server_default="1"),
-    sa.Column("is_current", sa.Boolean, nullable=False, server_default=sa.true()),
-    sa.Column("superseded_at", sa.DateTime(timezone=True)),
-    sa.Column("amendment_uid", sa.String(100)),
-    sa.Column("s3_key", sa.Text),
-    sa.Column(
-        "scraped_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    ),
-    # One current version per article.
-    sa.Index(
-        "uq_raw_law_article_current",
-        "texte_uid",
-        "article_ref",
-        unique=True,
-        postgresql_where=sa.text("is_current"),
-    ),
-)
-
 
 # ── Sittings ──────────────────────────────────────────────────────────────────
 

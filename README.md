@@ -145,7 +145,7 @@ src/
 ├── infrastructure/    adaptateurs concrets
 │   ├── adapters/      parseurs XML/JSON de l'Assemblée (députés, lois, débats, amendements, scrutins, agenda)
 │   ├── http/          client httpx avec retry (tenacity), lecture d'archives ZIP
-│   ├── persistence/   engine SQLAlchemy async, tables et repositories du schéma raw, checksums
+│   ├── persistence/   engine SQLAlchemy async, tables et repositories du schéma raw
 │   └── storage/       adaptateur Garage S3
 ├── interfaces/        API FastAPI (routes/) et CLI (cli.py)
 ├── composition.py     racine de composition — seul module qui relie infrastructure et application
