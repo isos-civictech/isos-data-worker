@@ -19,13 +19,13 @@ XML field mapping (root: amendement, default namespace):
     deputy_uid       → signataires/auteur/acteurRef
     group_uid        → signataires/auteur/groupePolitiqueRef
     cosigner_uids    → signataires/cosignataires/acteurRef[]
-    signatories      → signataires/libelle                display string
+    signatories      → signataires/libelle                names, split on ',' and 'et'
     division_title   → pointeurFragmentTexte/division/titre     "Article 2"
     division_type    → …/division/type                      ARTICLE | ANNEXE | TITRE | CHAPITRE
     division_position→ …/division/avant_A_Apres             Avant | A | Après
     alinea           → …/amendementStandard/alinea/alineaDesignation  "Après l'alinéa 34"
-    content          → corps/contenuAuteur/dispositif      (HTML)
-    summary          → corps/contenuAuteur/exposeSommaire  (HTML)
+    content          → corps/contenuAuteur/dispositif      HTML in the source, plain text here
+    summary          → corps/contenuAuteur/exposeSommaire  idem ("exposé sommaire")
     deposited_at     → cycleDeVie/dateDepot
     published_at     → cycleDeVie/datePublication
     state            → cycleDeVie/etatDesTraitements/etat/libelle   "Discuté", "Irrecevable 40"…
@@ -86,7 +86,7 @@ class Amendment(BaseModel):
     deputy_uid: str | None = None
     group_uid: str | None = None
     cosigner_uids: list[str] = []
-    signatories: str | None = None
+    signatories: list[str] = []
     division_title: str | None = None
     division_type: str | None = None
     division_position: str | None = None

@@ -324,12 +324,12 @@ amendment = sa.Table(
     sa.Column("deputy_uid", sa.String(100)),
     sa.Column("group_uid", sa.String(100)),
     sa.Column("cosigner_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
-    sa.Column("signatories", sa.Text),
+    sa.Column("signatories", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Column("division_title", sa.Text),  # "Article 2"
     sa.Column("division_type", sa.String(50)),
     sa.Column("division_position", sa.String(20)),  # Avant | A | Après
     sa.Column("alinea", sa.Text),  # "Après l'alinéa 34"
-    sa.Column("content", sa.Text),
+    sa.Column("content", sa.Text),  # plain text, paragraphs separated by a blank line
     sa.Column("summary", sa.Text),
     sa.Column("deposited_at", sa.Date),
     sa.Column("published_at", sa.Date),

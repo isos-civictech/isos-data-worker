@@ -33,7 +33,8 @@ def test_author(seance):
     assert seance.deputy_uid == "PA841701"
     assert seance.group_uid == "PO845439"
     assert len(seance.cosigner_uids) == 36
-    assert seance.signatories.startswith("Mme")
+    assert seance.signatories[:2] == ["Mme Balage El Mariky", "M. Amirshahi"]
+    assert len(seance.signatories) == 37
 
 
 def test_target_and_outcome(seance):
@@ -41,7 +42,9 @@ def test_target_and_outcome(seance):
     assert (seance.division_title, seance.division_position) == ("Article 2", "A")
     assert seance.article_ref == "Article 2"
     assert seance.alinea is None, "the whole article is targeted"
-    assert seance.content.startswith("<p")
+    assert seance.content == "Supprimer cet article."
+    assert "<" not in seance.summary and "&" not in seance.summary
+    assert seance.summary.startswith("Cet amendement du groupe écologiste")
     assert seance.deposited_at == date(2026, 6, 25)
     assert (seance.state, seance.sub_state, seance.sort) == ("Discuté", "Rejeté", "Rejeté")
     assert seance.status == AmendmentStatus.REJECTED

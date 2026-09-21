@@ -19,6 +19,5 @@ def debate_row(raw: dict[str, Any]) -> dict[str, Any]:
         "calendar_status": "completed",
         # Only used when the sitting has no agenda entry (slug is write-once).
         "slug": f"seance-{date:%Y-%m-%d}-{slugify(uid)}"[:255],
-        "raw_s3_key": raw["s3_key"],
         "source_url": SITTING_PAGE.format(legislature=raw["legislature"], uid=uid),
     }

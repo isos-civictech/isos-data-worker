@@ -14,6 +14,7 @@ from src.domain.entities.amendment import Amendment
 from src.domain.ports.sources.amendment_source import AmendmentSource
 from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.validators import Legislature
+from src.infrastructure.adapters.html_text import html_to_text, split_names
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
 
@@ -123,13 +124,13 @@ class AnAmendmentAdapter(AmendmentSource):
                 for c in root.findall("{*}signataires/{*}cosignataires/{*}acteurRef")
                 if c.text and c.text.strip()
             ],
-            signatories=_text(root, "signataires/libelle"),
+            signatories=split_names(_text(root, "signataires/libelle")),
             division_title=_text(root, "pointeurFragmentTexte/division/titre"),
             division_type=_text(root, "pointeurFragmentTexte/division/type"),
             division_position=_text(root, "pointeurFragmentTexte/division/avant_A_Apres"),
             alinea=_text(root, "pointeurFragmentTexte/amendementStandard/alinea/alineaDesignation"),
-            content=_text(root, "corps/contenuAuteur/dispositif"),
-            summary=_text(root, "corps/contenuAuteur/exposeSommaire"),
+            content=html_to_text(_text(root, "corps/contenuAuteur/dispositif")),
+            summary=html_to_text(_text(root, "corps/contenuAuteur/exposeSommaire")),
             deposited_at=_date(_text(root, "cycleDeVie/dateDepot")),
             published_at=_date(_text(root, "cycleDeVie/datePublication")),
             state=_text(root, "cycleDeVie/etatDesTraitements/etat/libelle"),

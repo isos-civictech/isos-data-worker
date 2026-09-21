@@ -58,7 +58,7 @@ def law_row(law: Law, *, legislature_id: int) -> dict[str, Any]:
     return {
         "legislature_id": legislature_id,
         "type": law.law_type.value,
-        "number": law.number,
+        "texte_number": law.number,
         "name": short_name(law.title),
         "title": law.title,
         "slug": slugify(law.title, max_length=120),
