@@ -25,7 +25,8 @@ def test_row_translates_author_and_status():
     assert row["status"] == "adopted"
     assert row["article_ref"] == "Après l'article 3"
     assert row["number"] == "II-CF146"
-    assert (row["law_id"], row["law_reading_id"], row["debate_id"]) == (7, 3, None)
+    assert (row["law_id"], row["law_reading_id"]) == (7, 3)
+    assert "debate_id" not in row
     assert row["external_id"] == "AM1"
 
 

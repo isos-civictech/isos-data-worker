@@ -80,6 +80,7 @@ law = sa.Table(
     sa.Column("id", sa.Integer, primary_key=True),
     sa.Column("legislature_id", sa.Integer, nullable=False),
     sa.Column("type", pg.ENUM(name="law_type", create_type=False), nullable=False),
+    sa.Column("number", sa.Integer),  # the "n° 2681" of the deposited text
     sa.Column("name", sa.String(255), nullable=False),  # short, truncated
     sa.Column("title", sa.Text),  # full dossier title
     sa.Column("slug", sa.Text, nullable=False),
@@ -116,7 +117,6 @@ amendment = sa.Table(
     metadata,
     sa.Column("id", sa.Integer, primary_key=True),
     sa.Column("law_id", sa.Integer, nullable=False),
-    sa.Column("debate_id", sa.Integer),
     sa.Column("law_reading_id", sa.Integer),
     sa.Column("number", sa.String(20)),
     sa.Column("examined_by", sa.String(50)),

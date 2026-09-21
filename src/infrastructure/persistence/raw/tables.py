@@ -172,10 +172,37 @@ law_stage = sa.Table(
     sa.Column("decision", sa.Text),  # "adopté", "rejeté", "modifié"
     sa.Column("decision_code", sa.String(20)),  # "TSORTF01", "TSORTF07"…
     sa.Column("texte_uid", sa.String(100)),  # text deposited for this reading
+    sa.Column("commission_texte_uid", sa.String(100)),  # text adopted by the commission
     # Agenda uids of the public sittings (RUAN… / RUSN…): the law -> debate join.
     sa.Column("sitting_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_law_stage_dossier", "dossier_uid"),
 )
+
+# One row per document of a dossier: deposited text, commission text, report.
+law_texte = sa.Table(
+    "law_texte",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "PRJLANR5L17B2681"
+    sa.Column(
+        "dossier_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.law.dossier_uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("kind", sa.String(20)),  # PRJL | PION | PNRE | RAPP | RINF…
+    sa.Column("sub_kind", sa.String(50)),
+    sa.Column("number", sa.Integer),  # the "n° 2681"
+    sa.Column("title", sa.Text),
+    sa.Column("short_title", sa.Text),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("author_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("organe_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_law_texte_dossier", "dossier_uid"),
+    sa.Index("ix_raw_law_texte_number", "legislature", "number"),
+)
+
 
 # ── Sittings ──────────────────────────────────────────────────────────────────
 

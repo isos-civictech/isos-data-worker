@@ -3,6 +3,7 @@
 from typing import Any
 
 from src.domain.entities.law import Law
+from src.domain.entities.law_texte import LawTexte
 from src.domain.entities.legislative_stage import LegislativeStage
 from src.infrastructure.persistence.serving.slug import slugify
 
@@ -26,13 +27,18 @@ READINGS = {
 }
 
 
-def law_from_raw(row: dict[str, Any], stage_rows: list[dict[str, Any]]) -> Law:
-    """Rebuild the entity so status and type come from the domain, not from SQL."""
+def law_from_raw(
+    row: dict[str, Any],
+    stage_rows: list[dict[str, Any]],
+    texte_rows: list[dict[str, Any]] = (),
+) -> Law:
+    """Rebuild the entity so status, type and number come from the domain, not from SQL."""
     stages = [
         LegislativeStage(uid=s["stage_uid"], order=s["position"], **_stage_fields(s))
         for s in stage_rows
     ]
-    return Law(stages=stages, **{k: row[k] for k in Law.model_fields if k in row})
+    textes = [LawTexte(**{k: t[k] for k in LawTexte.model_fields if k in t}) for t in texte_rows]
+    return Law(stages=stages, textes=textes, **{k: row[k] for k in Law.model_fields if k in row})
 
 
 def _stage_fields(s: dict[str, Any]) -> dict[str, Any]:
@@ -52,6 +58,7 @@ def law_row(law: Law, *, legislature_id: int) -> dict[str, Any]:
     return {
         "legislature_id": legislature_id,
         "type": law.law_type.value,
+        "number": law.number,
         "name": short_name(law.title),
         "title": law.title,
         "slug": slugify(law.title, max_length=120),

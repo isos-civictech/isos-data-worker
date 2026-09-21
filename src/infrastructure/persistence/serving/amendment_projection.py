@@ -91,7 +91,10 @@ class SqlAmendmentProjection(AmendmentProjection):
 
     @staticmethod
     async def _readings(connection: AsyncConnection) -> dict[tuple[int, str], int]:
-        """(public law id, texte uid) -> law_reading id, via the stage the text was deposited in."""
+        """
+        (public law id, texte uid) -> law_reading id. Commission amendments target
+        the deposited text, séance amendments the commission's text: both map.
+        """
         stage, reading, law = raw.law_stage, pub.law_reading, pub.law
         reading_ids = {
             (law_id, chamber, number): rid
@@ -109,19 +112,21 @@ class SqlAmendmentProjection(AmendmentProjection):
         }
         stages = (
             await connection.execute(
-                sa.select(law.c.id, stage.c.texte_uid, stage.c.code)
+                sa.select(law.c.id, stage.c.texte_uid, stage.c.commission_texte_uid, stage.c.code)
                 .select_from(stage)
                 .join(law, law.c.external_id == stage.c.dossier_uid)
-                .where(stage.c.texte_uid.isnot(None))
             )
         ).all()
         out = {}
-        for law_id, texte_uid, code in stages:
-            if code in READINGS:
-                chamber, number = READINGS[code]
-                rid = reading_ids.get((law_id, chamber, number))
-                if rid is not None:
-                    out[(law_id, texte_uid)] = rid
+        for law_id, texte_uid, commission_texte_uid, code in stages:
+            if code not in READINGS:
+                continue
+            rid = reading_ids.get((law_id, *READINGS[code]))
+            if rid is None:
+                continue
+            for uid in (texte_uid, commission_texte_uid):
+                if uid:
+                    out[(law_id, uid)] = rid
         return out
 
     @staticmethod

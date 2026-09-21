@@ -7,10 +7,12 @@ Source: {base}/static/openData/repository/{legislature}/loi/dossiers_legislatifs
 """
 
 import json
+import re
 from datetime import date, datetime
 from typing import Any
 
 from src.domain.entities.law import Law
+from src.domain.entities.law_texte import LawTexte
 from src.domain.entities.legislative_stage import LegislativeStage
 from src.domain.ports.sources.law_source import LawSource
 from src.domain.ports.storage import RawStoragePort
@@ -23,6 +25,7 @@ ARCHIVE_PATH = (
     "Dossiers_Legislatifs.json.zip"
 )
 MEMBER_PREFIX = "json/dossierParlementaire/"
+DOCUMENT_PREFIX = "json/document/"
 EXAMINATION_ACTS = ("-REUNION", "-RAPPORT", "-SEANCE", "-DEC", "PROM-PUB")
 
 
@@ -83,10 +86,11 @@ class AnLawAdapter(LawSource):
 
     async def fetch_all(self, legislature: Legislature, limit: int | None = None) -> list[Law]:
         payload = await self._archive(legislature)
+        textes = self._textes_by_dossier(payload)
         laws: list[Law] = []
         for _, content in iter_zip_members(payload, prefix=MEMBER_PREFIX, suffix=".json"):
             # Older dossiers still in navette ship with the archive: keep them.
-            law = self._parse_dossier(content)
+            law = self._parse_dossier(content, textes)
             if law is None:
                 continue
             laws.append(law)
@@ -97,13 +101,25 @@ class AnLawAdapter(LawSource):
     async def fetch_by_uid(self, uid: str, legislature: Legislature) -> Law | None:
         payload = await self._archive(legislature)
         for _, content in iter_zip_members(payload, prefix=f"{MEMBER_PREFIX}{uid}.json"):
-            return self._parse_dossier(content)
+            return self._parse_dossier(content, self._textes_by_dossier(payload))
         return None
+
+    @classmethod
+    def _textes_by_dossier(cls, payload: bytes) -> dict[str, list[LawTexte]]:
+        """Documents live in their own files: one pass, grouped by dossier."""
+        grouped: dict[str, list[LawTexte]] = {}
+        for _, content in iter_zip_members(payload, prefix=DOCUMENT_PREFIX, suffix=".json"):
+            texte = cls._parse_document(content)
+            if texte is not None:
+                grouped.setdefault(texte.dossier_uid, []).append(texte)
+        return grouped
 
     # -- parsing: pure functions, covered by tests/adapters --------------------
 
     @classmethod
-    def _parse_dossier(cls, raw: bytes) -> Law | None:
+    def _parse_dossier(
+        cls, raw: bytes, textes: dict[str, list[LawTexte]] | None = None
+    ) -> Law | None:
         dossier = json.loads(raw).get("dossierParlementaire")
         if not dossier or not dossier.get("uid"):
             return None
@@ -128,6 +144,38 @@ class AnLawAdapter(LawSource):
             ],
             withdrawn=any(a.get("codeActe", "").endswith("-RTRINI") for a in _walk(dossier)),
             stages=stages,
+            textes=(textes or {}).get(dossier["uid"], []),
+        )
+
+    @staticmethod
+    def _parse_document(raw: bytes) -> LawTexte | None:
+        doc = json.loads(raw).get("document")
+        if not doc or not doc.get("uid") or not doc.get("dossierRef"):
+            return None
+        # A few documents carry no legislature: read it from the dossier uid ("DLR5L17N…").
+        legislature = doc.get("legislature") or re.search(r"L(\d+)N", doc["dossierRef"]).group(1)
+        classification = doc.get("classification") or {}
+        authors = _as_list((doc.get("auteurs") or {}).get("auteur"))
+        titles = doc.get("titres") or {}
+        number = (doc.get("notice") or {}).get("numNotice")
+        return LawTexte(
+            uid=doc["uid"],
+            dossier_uid=doc["dossierRef"],
+            legislature=int(legislature),
+            kind=(classification.get("type") or {}).get("code"),
+            sub_kind=(classification.get("sousType") or {}).get("code"),
+            number=int(number) if number and str(number).isdigit() else None,
+            title=titles.get("titrePrincipal"),
+            short_title=titles.get("titrePrincipalCourt"),
+            deposited_at=_date(
+                ((doc.get("cycleDeVie") or {}).get("chrono") or {}).get("dateDepot")
+            ),
+            author_uids=[
+                a["acteur"]["acteurRef"] for a in authors if a.get("acteur", {}).get("acteurRef")
+            ],
+            organe_uids=[
+                a["organe"]["organeRef"] for a in authors if a.get("organe", {}).get("organeRef")
+            ],
         )
 
     @staticmethod
@@ -147,6 +195,15 @@ class AnLawAdapter(LawSource):
             (a for a in nested if a.get("codeActe", "").endswith(("-DEC", "PROM-PUB"))), None
         )
         deposit = next((a for a in nested if a.get("codeActe", "").endswith("-DEPOT")), None)
+        report = next(
+            (
+                a
+                for a in nested
+                if a.get("codeActe", "").endswith(("-COM-FOND-RAPPORT", "-COM-RAPPORT-AN"))
+                and a.get("texteAdopte")
+            ),
+            None,
+        )
         conclusion = (decision or {}).get("statutConclusion") or {}
         return LegislativeStage(
             uid=acte["uid"],
@@ -160,6 +217,7 @@ class AnLawAdapter(LawSource):
             decision=conclusion.get("libelle"),
             decision_code=conclusion.get("fam_code"),
             texte_uid=(deposit or {}).get("texteAssocie"),
+            commission_texte_uid=(report or {}).get("texteAdopte"),
             sitting_refs=[
                 a["reunionRef"]
                 for a in nested

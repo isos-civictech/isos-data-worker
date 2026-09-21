@@ -23,7 +23,6 @@ def amendment_row(
 ) -> dict[str, Any]:
     return {
         "law_id": law_id,
-        "debate_id": None,  # an amendment is not tied to one sitting in the source
         "law_reading_id": reading_id,
         "number": a.number,
         "examined_by": a.examined_by,

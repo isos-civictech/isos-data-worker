@@ -63,7 +63,20 @@ class SqlLawProjection(LawProjection):
                     .mappings()
                     .all()
                 )
-                law = law_from_raw(dict(dossier), [dict(s) for s in stages])
+                textes = (
+                    (
+                        await connection.execute(
+                            sa.select(raw.law_texte).where(
+                                raw.law_texte.c.dossier_uid == dossier["dossier_uid"]
+                            )
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                law = law_from_raw(
+                    dict(dossier), [dict(s) for s in stages], [dict(t) for t in textes]
+                )
                 if not law.is_law:
                     report.skipped += 1
                     continue
