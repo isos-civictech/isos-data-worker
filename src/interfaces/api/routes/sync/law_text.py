@@ -11,6 +11,12 @@ from src.interfaces.api.dependencies import get_engine, get_settings_dep
 
 router = APIRouter(tags=["law texts"])
 
+KIND_ORDER = sa.case(
+    (raw.law_text.c.kind == "deposited", 0),
+    (raw.law_text.c.kind == "commission", 1),
+    else_=2,
+)
+
 
 @router.post("/collect/law-texts")
 async def collect_law_texts(
@@ -58,16 +64,26 @@ async def sync_law_texts(
 async def article_versions(
     uid: str, article_ref: str, engine: AsyncEngine = Depends(get_engine)
 ) -> list[dict]:
-    """One article of a dossier, version after version, with the amendments that targeted it."""
-    t, a, am = raw.law_text, raw.law_article, raw.amendment
+    """
+    One article of a dossier along the navette: deposited, then commission,
+    then adopted… Each version lists the amendments that targeted it; the
+    adopted ones explain the difference with the next version.
+    """
+    t, a, am, doc = raw.law_text, raw.law_article, raw.amendment, raw.law_texte
     query = (
         sa.select(t.c.texte_uid, t.c.kind, a.c.is_new, a.c.mention, a.c.content)
-        .select_from(a.join(t, t.c.texte_uid == a.c.texte_uid))
+        .select_from(
+            a.join(t, t.c.texte_uid == a.c.texte_uid).outerjoin(doc, doc.c.uid == t.c.texte_uid)
+        )
         .where(t.c.dossier_uid == uid, a.c.article_ref == article_ref)
-        .order_by(t.c.texte_uid)
+        # Same order as public.law_text.position.
+        .order_by(doc.c.deposited_at.nulls_last(), KIND_ORDER, t.c.texte_uid)
     )
     async with engine.connect() as connection:
-        versions = [dict(r) for r in (await connection.execute(query)).mappings().all()]
+        versions = [
+            {"position": position, **r}
+            for position, r in enumerate((await connection.execute(query)).mappings().all(), 1)
+        ]
         for v in versions:
             amendments = (
                 await connection.execute(
