@@ -59,6 +59,12 @@ _PAGE = """<!doctype html>
     <tr><td>POST /collect/deputies/{uid}</td><td>un seul, raw seulement</td></tr>
     <tr><td>POST /project/deputies</td><td>raw → public seulement, sans réseau —
         à relancer après une correction de projection</td></tr>
+    <tr><td>POST /sync/debates</td><td>les comptes rendus de séance — options
+        <code>since</code>, <code>until</code> (YYYY-MM-DD)</td></tr>
+    <tr><td>POST /sync/agenda</td><td>l'ordre du jour : séances passées, annulées et
+        <b>à venir</b> — mêmes options</td></tr>
+    <tr><td>GET /agenda/today</td><td>ce qui est à l'ordre du jour aujourd'hui</td></tr>
+    <tr><td>GET /agenda/upcoming</td><td>les prochaines séances</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>
