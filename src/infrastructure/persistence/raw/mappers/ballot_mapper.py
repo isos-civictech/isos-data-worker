@@ -10,7 +10,7 @@ def ballot_row(b: Ballot) -> dict[str, Any]:
         "uid": b.uid,
         "legislature": b.legislature,
         "number": b.number,
-        "sitting_uid": b.sitting_uid,
+        "agenda_uid": b.agenda_uid,
         "session_ref": b.session_ref,
         "date": b.date,
         "kind": b.kind.value,

@@ -8,7 +8,7 @@ JSON field mapping (root key: scrutin):
     uid              → uid                                  "VTANR5L17V2657"
     legislature      → legislature
     number           → numero
-    sitting_uid      → seanceRef                            "RUANR5L17S2025IDS29580" = agenda uid
+    agenda_uid       → seanceRef                 "RUANR5L17S2025IDS29580" = raw.agenda_item.uid
     session_ref      → sessionRef                           "SCR5A2025O1"
     date             → dateScrutin
     kind             → typeVote/codeTypeVote                SPO | SPS | MOC
@@ -87,7 +87,7 @@ class Ballot(BaseModel):
     uid: NotBlankStr
     legislature: Legislature
     number: int
-    sitting_uid: NotBlankStr
+    agenda_uid: NotBlankStr
     session_ref: str | None = None
     date: date
     kind: BallotKind

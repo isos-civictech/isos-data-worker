@@ -125,7 +125,7 @@ class AnBallotAdapter(BallotSource):
             uid=s["uid"],
             legislature=int(s.get("legislature") or 0),
             number=int(s.get("numero") or 0),
-            sitting_uid=s["seanceRef"],
+            agenda_uid=s["seanceRef"],
             session_ref=s.get("sessionRef"),
             date=_date(s.get("dateScrutin")),
             kind=kind.get("codeTypeVote"),

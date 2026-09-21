@@ -10,7 +10,7 @@ from tests.application.test_collect_deputies import FakeLog
 
 def _ballot(uid: str) -> Ballot:
     return Ballot(
-        uid=uid, legislature=17, number=1, sitting_uid="S", date=date(2025, 1, 1), kind="SPO"
+        uid=uid, legislature=17, number=1, agenda_uid="S", date=date(2025, 1, 1), kind="SPO"
     )
 
 

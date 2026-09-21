@@ -10,7 +10,7 @@ from src.infrastructure.persistence.serving.mappers.ballot_mapper import (
 
 def test_amendment_number_patterns():
     base = dict(
-        uid="V", legislature=17, number=1, sitting_uid="S", date=date(2025, 1, 1), kind="SPO"
+        uid="V", legislature=17, number=1, agenda_uid="S", date=date(2025, 1, 1), kind="SPO"
     )
     assert Ballot(**base, title="l'amendement n° 585 de M. Pauget").amendment_number == "585"
     assert (

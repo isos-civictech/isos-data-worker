@@ -2,14 +2,16 @@
 raw -> public projection for scrutins.
 
 Links, in order of confidence:
-  sitting    raw.ballot.sitting_uid = public.debate.external_id (always present)
+  sitting    raw.ballot.agenda_uid = public.debate.external_id (always present)
   law        raw.ballot.dossier_uid when the source gives it, else the only
              dossier on the sitting's agenda, else the agenda dossier whose
              title is quoted in the scrutin's title
   reading    the law's stage whose sitting_refs contain the sitting
   amendment  the séance amendment with the number quoted in the title, on a
              text of that reading
-Lookups are loaded once; ~1.3 M deputy votes go in by pages.
+The resolved law and amendment are also written back to raw.ballot
+(resolved_dossier_uid, resolved_amendment_uid) so the chain can be followed
+there too. Lookups are loaded once; ~1.3 M deputy votes go in by pages.
 """
 
 import sqlalchemy as sa
@@ -42,8 +44,9 @@ class _Lookups:
         self.agenda_dossiers: dict[str, set[str]] = {}  # agenda uid -> dossier uids
         self.readings: dict[tuple[str, str], tuple[int, set[str]]] = {}
         # (dossier uid, sitting uid) -> (law_reading id, texte uids of that reading)
-        self.amendments: dict[tuple[str, str], int] = {}  # (texte uid, number) -> public id
-        self.amendments_by_bare: dict[tuple[str, str], list[tuple[int, object]]] = {}
+        # (texte uid, number) -> (public.amendment.id, raw uid)
+        self.amendments: dict[tuple[str, str], tuple[int, str]] = {}
+        self.amendments_by_bare: dict[tuple[str, str], list[tuple[tuple[int, str], object]]] = {}
 
     async def load(self, connection: AsyncConnection) -> None:
         self.debates = await _map(connection, pub.debate.c.external_id, pub.debate.c.id)
@@ -72,20 +75,21 @@ class _Lookups:
                     raw.amendment.c.number,
                     raw.amendment.c.sorted_at,
                     pub.amendment.c.id,
+                    raw.amendment.c.uid,
                 )
                 .select_from(raw.amendment)
                 .join(pub.amendment, pub.amendment.c.external_id == raw.amendment.c.uid)
                 .where(raw.amendment.c.examined_by == "AN")
             )
         ).all()
-        for texte, number, sorted_at, amendment_id in rows:
-            self.amendments[(texte, number)] = amendment_id
+        for texte, number, sorted_at, amendment_id, amendment_uid in rows:
+            self.amendments[(texte, number)] = (amendment_id, amendment_uid)
             # Budget bills number "I-1762" / "II-1762" while the scrutin says "1762":
             # keep both under the bare number, the decision date tells them apart.
             bare = number.rsplit("-", 1)[-1] if number and "-" in number else None
             if bare:
                 self.amendments_by_bare.setdefault((texte, bare), []).append(
-                    (amendment_id, sorted_at.date() if sorted_at else None)
+                    ((amendment_id, amendment_uid), sorted_at.date() if sorted_at else None)
                 )
 
     async def _load_readings(self, connection: AsyncConnection) -> None:
@@ -130,7 +134,7 @@ class _Lookups:
     def law_for(self, ballot: dict) -> str | None:
         if ballot["dossier_uid"] in self.laws:
             return ballot["dossier_uid"]
-        candidates = self.agenda_dossiers.get(ballot["sitting_uid"], set()) & self.laws.keys()
+        candidates = self.agenda_dossiers.get(ballot["agenda_uid"], set()) & self.laws.keys()
         if len(candidates) == 1:
             return next(iter(candidates))
         # Several laws that day: the scrutin's title quotes one of them. Titles
@@ -147,7 +151,8 @@ class _Lookups:
             return None
         return scored[0][1]
 
-    def amendment_for(self, ballot: Ballot, textes: set[str]) -> int | None:
+    def amendment_for(self, ballot: Ballot, textes: set[str]) -> tuple[int, str] | None:
+        """(public id, raw uid) of the amendment the scrutin is about."""
         number = ballot.amendment_number
         if not number:
             return None
@@ -206,7 +211,7 @@ class SqlBallotProjection(BallotProjection):
 
         for row in ballots:
             report.processed += 1
-            debate_id = lookups.debates.get(row["sitting_uid"])
+            debate_id = lookups.debates.get(row["agenda_uid"])
             if debate_id is None:
                 report.skipped += 1  # sitting not on the agenda we collected
                 continue
@@ -220,13 +225,26 @@ class SqlBallotProjection(BallotProjection):
         self, connection: AsyncConnection, row: dict, debate_id: int, lookups: _Lookups
     ) -> bool:
         dossier_uid = lookups.law_for(row)
-        reading_id, textes = lookups.readings.get((dossier_uid, row["sitting_uid"]), (None, set()))
+        reading_id, textes = lookups.readings.get((dossier_uid, row["agenda_uid"]), (None, set()))
         ballot = Ballot(**{k: row[k] for k in Ballot.model_fields if k in row})
+        amendment = lookups.amendment_for(ballot, textes)
+        if (dossier_uid, amendment and amendment[1]) != (
+            row["resolved_dossier_uid"],
+            row["resolved_amendment_uid"],
+        ):
+            await connection.execute(
+                sa.update(raw.ballot)
+                .where(raw.ballot.c.uid == row["uid"])
+                .values(
+                    resolved_dossier_uid=dossier_uid,
+                    resolved_amendment_uid=amendment and amendment[1],
+                )
+            )
         public_row = ballot_row(
             row,
             debate_id=debate_id,
             law_id=lookups.laws.get(dossier_uid),
-            amendment_id=lookups.amendment_for(ballot, textes),
+            amendment_id=amendment and amendment[0],
             reading_id=reading_id,
         )
         statement = (

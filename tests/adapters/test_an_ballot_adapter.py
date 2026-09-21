@@ -19,7 +19,7 @@ def ballot():
 def test_header(ballot):
     assert ballot.uid == "VTANR5L17V3985"
     assert ballot.number == 3985
-    assert ballot.sitting_uid == "RUANR5L17S2026IDS29933", "the agenda uid: public.debate"
+    assert ballot.agenda_uid == "RUANR5L17S2026IDS29933", "the agenda uid: public.debate"
     assert ballot.date == date(2025, 11, 19)
     assert ballot.kind == BallotKind.ORDINARY
     assert ballot.result == "rejeté" and not ballot.adopted
