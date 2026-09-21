@@ -149,9 +149,10 @@ class AnDebateAdapter(DebateSource):
 
         contenu = root.find("{*}contenu")
         points: list[DebatePoint] = []
+        nivpoints: list[int] = []  # parallel to `points`, parsing-time only
         if contenu is not None:
             for point in contenu.findall("{*}point"):
-                cls._collect_points(point, parent_uid=None, out=points)
+                cls._collect_points(point, parent_uid=None, out=points, levels=nivpoints)
 
         return Debate(
             uid=uid,
@@ -164,10 +165,24 @@ class AnDebateAdapter(DebateSource):
         )
 
     @classmethod
-    def _collect_points(cls, node, *, parent_uid: str | None, out: list[DebatePoint]) -> None:
+    def _collect_points(
+        cls, node, *, parent_uid: str | None, out: list[DebatePoint], levels: list[int]
+    ) -> None:
+        """
+        Flatten a <point> and its nested <point>s.
+
+        The AN nests some points in the XML and merely *sequences* others after
+        a heading (nivpoint 1 = section title, 2 = topic, 99 = procedural).
+        Both cases become one tree: a point's parent is the enclosing <point>
+        when nested, otherwise the last preceding point with a smaller nivpoint.
+        """
         uid = node.get("id_syceron")
         if not uid:
             return
+        nivpoint = _int(node.get("nivpoint")) or 1
+        if parent_uid is None:
+            parent_uid = cls._section_parent(out, levels, nivpoint)
+
         number = _texte_number(node.get("bibard"))
         out.append(
             DebatePoint(
@@ -175,7 +190,6 @@ class AnDebateAdapter(DebateSource):
                 parent_uid=parent_uid,
                 title=_text(node, "texte"),
                 kind=node.get("code_grammaire") or None,
-                level=_int(node.get("nivpoint")) or 1,
                 order=_int(node.get("ordre_absolu_seance")) or 0,
                 texte_refs=[number] if number else [],
                 interventions=[
@@ -183,8 +197,17 @@ class AnDebateAdapter(DebateSource):
                 ],
             )
         )
+        levels.append(nivpoint)
         for child in node.findall("{*}point"):
-            cls._collect_points(child, parent_uid=uid, out=out)
+            cls._collect_points(child, parent_uid=uid, out=out, levels=levels)
+
+    @staticmethod
+    def _section_parent(points: list[DebatePoint], levels: list[int], nivpoint: int) -> str | None:
+        """Nearest preceding point with a smaller nivpoint, i.e. its heading."""
+        for previous, level in zip(reversed(points), reversed(levels), strict=True):
+            if level < nivpoint:
+                return previous.uid
+        return None
 
     @staticmethod
     def _parse_paragraphe(node) -> Intervention | None:

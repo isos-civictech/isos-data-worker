@@ -74,13 +74,12 @@ def test_sitting_metadata(debate):
     assert debate.title == "Première séance du mercredi 06 novembre 2024"
 
 
-def test_points_are_flattened_with_parent_and_level(debate):
+def test_points_form_a_tree(debate):
+    """Nested points keep their XML parent; sequenced topics get the heading before them."""
     by_uid = {p.uid: p for p in debate.points}
-    child = by_uid["3555259"]
-    assert child.parent_uid == "3555308"
-    assert child.level == 99
-    assert child.kind == "SUSP_SEANCE_1_1"
-    assert by_uid["3555181"].parent_uid is None
+    assert by_uid["3555259"].parent_uid == "3555308"  # nested in the XML
+    assert by_uid["3555259"].kind == "SUSP_SEANCE_1_1"
+    assert by_uid["3555181"].parent_uid is None  # first point, no heading before it
 
 
 def test_point_carries_its_kind_and_title(debate):

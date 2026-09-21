@@ -25,7 +25,6 @@ def point_row(point: DebatePoint, *, debate_uid: str) -> dict[str, Any]:
         "parent_uid": point.parent_uid,
         "title": point.title,
         "kind": point.kind,
-        "level": point.level,
         "position": point.order,
         "texte_refs": point.texte_refs,
     }

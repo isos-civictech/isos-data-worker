@@ -1,8 +1,8 @@
 """
 DebatePoint — one agenda item (point d'ordre du jour) inside a sitting.
 
-Points nest: a text under discussion holds its articles, which hold their
-amendments. `level` is the nesting depth, `parent_uid` the enclosing point.
+Points form a tree through `parent_uid`: a section heading ("Questions au
+Gouvernement") holds its topics, a text under discussion holds its articles.
 
 XML field mapping (compteRendu/contenu//point):
     uid         → @id_syceron
@@ -10,7 +10,6 @@ XML field mapping (compteRendu/contenu//point):
     kind        → @code_grammaire       ("QG_1_1" questions au gouvernement,
                                          "DISC_ARTICLES_*" discussion d'un texte,
                                          "SUSP_SEANCE_1_1" suspension…)
-    level       → @nivpoint
     order       → @ordre_absolu_seance
     texte_refs  → @bibard               the text NUMBER ("2765", "n° 1043 rectifié"),
                                         never a uid — the join to a law goes
@@ -32,7 +31,6 @@ class DebatePoint(BaseModel):
     parent_uid: str | None = None
     title: str | None = None
     kind: str | None = None
-    level: int = 1
     order: int = 0
     texte_refs: list[str] = []
     interventions: list[Intervention] = []

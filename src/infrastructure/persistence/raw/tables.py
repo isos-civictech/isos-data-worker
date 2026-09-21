@@ -226,7 +226,6 @@ debate_point = sa.Table(
     sa.Column("parent_uid", sa.String(100)),
     sa.Column("title", sa.Text),
     sa.Column("kind", sa.String(50)),  # code_grammaire: QG_1_1, DISC_ARTICLES_3_1, …
-    sa.Column("level", sa.Integer, nullable=False, server_default="1"),
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
     # Text NUMBERS (bibard), not uids: the join to a law goes through the number.
     sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
