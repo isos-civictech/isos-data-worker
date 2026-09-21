@@ -189,6 +189,7 @@ law_stage = sa.Table(
     sa.Column("decision_code", sa.String(20)),  # "TSORTF01", "TSORTF07"…
     sa.Column("texte_uid", sa.String(100)),  # text deposited for this reading
     sa.Column("commission_texte_uid", sa.String(100)),  # text adopted by the commission
+    sa.Column("adopted_texte_uid", sa.String(100)),  # text adopted in séance (BTA)
     # Agenda uids of the public sittings (RUAN… / RUSN…): the law -> debate join.
     sa.Column("sitting_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_law_stage_dossier", "dossier_uid"),
@@ -217,6 +218,45 @@ law_texte = sa.Table(
     sa.Column("organe_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_law_texte_dossier", "dossier_uid"),
     sa.Index("ix_raw_law_texte_number", "legislature", "number"),
+)
+
+
+# One version of a law's text, scraped from the website (see law_text.py).
+# A uid never changes: fetched once. available = false remembers a 404.
+law_text = sa.Table(
+    "law_text",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("texte_uid", sa.String(100), nullable=False, unique=True),  # -> raw.law_texte.uid
+    sa.Column("dossier_uid", sa.String(100)),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("kind", sa.String(20)),  # deposited | commission | adopted
+    sa.Column("available", sa.Boolean, nullable=False, server_default=sa.true()),
+    sa.Column("source_url", sa.Text),
+    sa.Column("article_count", sa.Integer, nullable=False, server_default="0"),
+    *_seen_columns(),
+    sa.Index("ix_raw_law_text_dossier", "dossier_uid"),
+)
+
+# One article of one text version. Amendments target (texte_uid, article_ref).
+law_article = sa.Table(
+    "law_article",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "texte_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.law_text.texte_uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("article_ref", sa.Text, nullable=False),  # "Article 2 bis"
+    sa.Column("is_new", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("position", sa.Integer, nullable=False),
+    sa.Column("section", sa.Text),
+    sa.Column("content", sa.Text),  # alinéas, one per line
+    sa.Column("mention", sa.String(50)),  # Supprimé | Non modifié | Conforme…
+    sa.UniqueConstraint("texte_uid", "position", name="uq_raw_law_article"),
+    sa.Index("ix_raw_law_article_ref", "texte_uid", "article_ref"),
 )
 
 

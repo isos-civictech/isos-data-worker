@@ -61,6 +61,7 @@ def test_commission_text_on_the_reading(law):
     an1 = law.stages[1]
     assert an1.commission_texte_uid is None, "the AN commission adopted no text here"
     assert law.stages[0].commission_texte_uid == "PRJLSNR5S479BTC0521"
+    assert law.stages[0].adopted_texte_uid == "PRJLSNR5S479BTA0090"
 
 
 def test_document_gives_the_texte_number():

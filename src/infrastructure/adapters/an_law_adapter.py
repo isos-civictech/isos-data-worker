@@ -205,6 +205,16 @@ class AnLawAdapter(LawSource):
             None,
         )
         conclusion = (decision or {}).get("statutConclusion") or {}
+        adopted = next(
+            (
+                t.get("refTexteAssocie")
+                for t in _as_list(
+                    ((decision or {}).get("textesAssocies") or {}).get("texteAssocie")
+                )
+                if t.get("typeTexte") == "BTA"
+            ),
+            None,
+        )
         return LegislativeStage(
             uid=acte["uid"],
             code=acte.get("codeActe") or acte["uid"],
@@ -218,6 +228,7 @@ class AnLawAdapter(LawSource):
             decision_code=conclusion.get("fam_code"),
             texte_uid=(deposit or {}).get("texteAssocie"),
             commission_texte_uid=(report or {}).get("texteAdopte"),
+            adopted_texte_uid=adopted,
             sitting_refs=[
                 a["reunionRef"]
                 for a in nested

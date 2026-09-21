@@ -15,6 +15,7 @@ from src.composition import (
     build_collect_ballots,
     build_collect_debates,
     build_collect_deputies,
+    build_collect_law_texts,
     build_collect_laws,
     build_engine,
     build_project_agenda,
@@ -22,6 +23,7 @@ from src.composition import (
     build_project_ballots,
     build_project_debates,
     build_project_deputies,
+    build_project_law_texts,
     build_project_laws,
 )
 from src.config import get_settings
@@ -153,6 +155,26 @@ async def _project_ballots(args) -> SyncReport:
         await engine.dispose()
 
 
+async def _collect_law_texts(args) -> SyncReport:
+    settings = get_settings()
+    engine = build_engine(settings)
+    try:
+        async with build_collect_law_texts(settings, engine, dry_run=args.dry_run) as use_case:
+            return await use_case.execute(
+                args.legislature, dossier_uid=args.dossier, texte_uid=args.uid, limit=args.limit
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _project_law_texts(args) -> SyncReport:
+    engine = build_engine(get_settings())
+    try:
+        return await build_project_law_texts(engine).execute(args.legislature)
+    finally:
+        await engine.dispose()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="isos-data-worker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -249,6 +271,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     project_b.add_argument("--legislature", type=int, default=None)
     project_b.set_defaults(handler=_project_ballots)
+
+    collect_t = sub.add_parser(
+        "collect-law-texts", help="assemblee-nationale.fr → raw.law_text (articles), incremental"
+    )
+    collect_t.add_argument("--legislature", type=int, default=None)
+    collect_t.add_argument("--dossier", default=None, help="one dossier only (DLR…)")
+    collect_t.add_argument("--uid", default=None, help="one text (PRJLANR5L17B2681)")
+    collect_t.add_argument("--limit", type=int, default=None, help="stop after N texts")
+    collect_t.add_argument("--dry-run", action="store_true")
+    collect_t.set_defaults(handler=_collect_law_texts)
+
+    project_t = sub.add_parser(
+        "project-law-texts", help="raw.law_text → public.law_text, law_article (no network)"
+    )
+    project_t.add_argument("--legislature", type=int, default=None)
+    project_t.set_defaults(handler=_project_law_texts)
 
     return parser
 

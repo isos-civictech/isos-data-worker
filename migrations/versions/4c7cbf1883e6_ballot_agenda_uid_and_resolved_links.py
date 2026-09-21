@@ -21,9 +21,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.alter_column("ballot", "sitting_uid", new_column_name="agenda_uid", schema="raw")
     op.execute("ALTER INDEX raw.ix_raw_ballot_sitting RENAME TO ix_raw_ballot_agenda")
-    op.add_column(
-        "ballot", sa.Column("resolved_dossier_uid", sa.String(length=100)), schema="raw"
-    )
+    op.add_column("ballot", sa.Column("resolved_dossier_uid", sa.String(length=100)), schema="raw")
     op.add_column(
         "ballot", sa.Column("resolved_amendment_uid", sa.String(length=100)), schema="raw"
     )

@@ -120,6 +120,7 @@ amendment = sa.Table(
     sa.Column("number", sa.String(20)),
     sa.Column("examined_in", sa.String(50)),
     sa.Column("article_ref", sa.String(255)),
+    sa.Column("law_article_id", sa.Integer),
     sa.Column(
         "author_type", pg.ENUM(name="amendment_author_type", create_type=False), nullable=False
     ),
@@ -159,4 +160,31 @@ deputy_vote = sa.Table(
     sa.Column("political_group_id", sa.Integer),
     sa.Column("position", pg.ENUM(name="vote_position", create_type=False), nullable=False),
     sa.Column("updated_at", sa.DateTime(timezone=True)),
+)
+
+law_text = sa.Table(
+    "law_text",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("law_id", sa.Integer, nullable=False),
+    sa.Column("law_reading_id", sa.Integer),
+    sa.Column("kind", pg.ENUM(name="law_text_kind", create_type=False), nullable=False),
+    sa.Column("texte_number", sa.Integer),
+    sa.Column("position", sa.Integer, nullable=False),
+    sa.Column("source_url", sa.Text),
+    sa.Column("external_id", sa.String(100)),
+    sa.Column("updated_at", sa.DateTime(timezone=True)),
+)
+
+law_article = sa.Table(
+    "law_article",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("law_text_id", sa.Integer, nullable=False),
+    sa.Column("article_ref", sa.String(255), nullable=False),
+    sa.Column("position", sa.Integer, nullable=False),
+    sa.Column("section", sa.String(255)),
+    sa.Column("content", sa.Text),
+    sa.Column("mention", sa.String(50)),
+    sa.Column("is_new", sa.Boolean, nullable=False),
 )

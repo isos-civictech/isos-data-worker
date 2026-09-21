@@ -22,6 +22,7 @@ JSON field mapping (one depth-1 acteLegislatif):
     texte_uid     → texteAssocie of the *-DEPOT act         "PRJLANR5L17B2681"
     commission_texte_uid → texteAdopte of the *-COM-FOND-RAPPORT act  "PRJLANR5L17BTC3046"
                     (séance amendments target this one, commission amendments the deposited one)
+    adopted_texte_uid → textesAssocies BTA of the *-DEC act    "PRJLANR5L17BTA0326" (texte adopté)
     sitting_refs  → reunionRef of *-DEBATS-SEANCE acts      "RUANR5L17S2026IDS30781"
                     (= agenda uid = public.debate.external_id)
 """
@@ -59,6 +60,7 @@ class LegislativeStage(BaseModel):
     decision_code: str | None = None
     texte_uid: str | None = None
     commission_texte_uid: str | None = None
+    adopted_texte_uid: str | None = None
     sitting_refs: list[str] = []
 
     @computed_field
