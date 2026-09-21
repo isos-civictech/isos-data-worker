@@ -125,8 +125,6 @@ amendment = sa.Table(
     ),
     sa.Column("deputy_id", sa.Integer),
     sa.Column("political_group_id", sa.Integer),
-    sa.Column("content", sa.Text),
-    sa.Column("summary", sa.Text),
     sa.Column("status", pg.ENUM(name="amendment_status", create_type=False), nullable=False),
     sa.Column("deposited_at", sa.Date),
     sa.Column("external_id", sa.String(100)),

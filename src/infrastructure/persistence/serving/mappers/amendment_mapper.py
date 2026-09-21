@@ -1,4 +1,4 @@
-"""`raw.amendment` row -> `public.amendment` row."""
+"""`raw.amendment` row -> `public.amendment` row. Bodies stay in raw: the front does not show them."""
 
 from typing import Any
 
@@ -30,8 +30,6 @@ def amendment_row(
         "author_type": AUTHOR_TYPES[a.author_type.value],
         "deputy_id": deputy_id,
         "political_group_id": group_id,
-        "content": a.content,
-        "summary": a.summary,
         "status": a.status.value,
         "deposited_at": a.deposited_at,
         "external_id": a.uid,
