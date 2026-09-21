@@ -1,4 +1,4 @@
-"""`raw.amendment` row -> `public.amendment` row. Bodies stay in raw: the front does not show them."""
+"""`raw.amendment` row -> `public.amendment` row. Bodies stay in raw (not displayed)."""
 
 from typing import Any
 
