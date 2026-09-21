@@ -43,7 +43,7 @@ Onze fichiers, un par notion. Ce sont des modèles Pydantic v2 : ils valident ce
 | `debate_point.py` | un point d'ordre du jour | **le niveau « sujet »** |
 | `intervention.py` | une prise de parole | |
 | `amendment.py` | un amendement | |
-| `assembly_vote.py` | un scrutin | + `Voter`, `NominalVoteCount` |
+| `ballot.py` | un scrutin public | + `BallotVote` (un député), `GroupVote` (un groupe) |
 | `agenda_item.py` | une séance prévue | `is_ready_to_scrape` déclenche la collecte |
 
 ### Les docstrings sont la spécification de scraping

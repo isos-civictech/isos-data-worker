@@ -73,6 +73,10 @@ _PAGE = """<!doctype html>
         340 Mo, comptez quelques minutes ; options <code>dossier</code>, <code>since</code>.
         À lancer <b>après</b> les lois et les députés</td></tr>
     <tr><td>GET /laws/{uid}/amendments</td><td>les amendements d'un dossier</td></tr>
+    <tr><td>POST /sync/ballots</td><td>les scrutins publics et le vote de chaque député —
+        liés à la séance, à la loi, à la lecture et à l'amendement voté.
+        À lancer <b>en dernier</b></td></tr>
+    <tr><td>GET /deputies/{uid}/votes</td><td>les derniers votes d'un député</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>
