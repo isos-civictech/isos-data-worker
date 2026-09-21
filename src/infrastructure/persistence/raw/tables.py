@@ -358,3 +358,87 @@ amendment = sa.Table(
     sa.Index("ix_raw_amendment_texte", "texte_uid"),
     sa.Index("ix_raw_amendment_deputy", "deputy_uid"),
 )
+
+
+# ── Ballots ───────────────────────────────────────────────────────────────────
+
+ballot = sa.Table(
+    "ballot",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "VTANR5L17V2657"
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("number", sa.Integer, nullable=False),
+    # The sitting: raw.agenda_item.uid, whose compte_rendu_uid leads to raw.debate.
+    sa.Column("agenda_uid", sa.String(100), nullable=False),
+    sa.Column("session_ref", sa.String(50)),
+    sa.Column("date", sa.Date, nullable=False),
+    sa.Column("kind", sa.String(10), nullable=False),  # SPO | SPS | MOC
+    sa.Column("kind_label", sa.Text),
+    sa.Column("majority_rule", sa.Text),
+    sa.Column("result", sa.String(20)),  # adopté | rejeté
+    sa.Column("title", sa.Text),
+    sa.Column("requested_by", sa.Text),
+    # From the source, filled in ~30 % of scrutins only.
+    sa.Column("dossier_uid", sa.String(100)),
+    # Resolved by the worker (title, agenda, decision date): the law voted on and,
+    # for a vote on an amendment, raw.amendment.uid.
+    sa.Column("resolved_dossier_uid", sa.String(100)),
+    sa.Column("resolved_amendment_uid", sa.String(100)),
+    sa.Column("location", sa.String(50)),
+    sa.Column("voters", sa.Integer),
+    sa.Column("expressed", sa.Integer),
+    sa.Column("required", sa.Integer),
+    sa.Column("for_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("against_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("abstention_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_voluntary_count", sa.Integer, nullable=False, server_default="0"),
+    *_seen_columns(),
+    sa.Index("ix_raw_ballot_agenda", "agenda_uid"),
+    sa.Index("ix_raw_ballot_dossier", "dossier_uid"),
+    sa.Index("ix_raw_ballot_resolved_dossier", "resolved_dossier_uid"),
+    sa.Index("ix_raw_ballot_resolved_amendment", "resolved_amendment_uid"),
+)
+
+# How each political group voted.
+ballot_group = sa.Table(
+    "ballot_group",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "ballot_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.ballot.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("group_uid", sa.String(100), nullable=False),
+    sa.Column("members", sa.Integer),
+    sa.Column("majority_position", sa.String(30)),
+    sa.Column("for_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("against_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("abstention_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_count", sa.Integer, nullable=False, server_default="0"),
+    sa.UniqueConstraint("ballot_uid", "group_uid", name="uq_raw_ballot_group"),
+)
+
+# One deputy's position on one scrutin (~150 rows per ballot, ~1.3 M per legislature).
+ballot_vote = sa.Table(
+    "ballot_vote",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "ballot_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.ballot.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("deputy_uid", sa.String(100), nullable=False),
+    sa.Column("mandate_uid", sa.String(100)),
+    sa.Column("group_uid", sa.String(100)),
+    sa.Column("position", sa.String(30), nullable=False),  # pour | contre | abstention | nonVotant…
+    sa.Column("by_delegation", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("corrected_position", sa.String(30)),  # "mise au point" declared afterwards
+    sa.UniqueConstraint("ballot_uid", "deputy_uid", name="uq_raw_ballot_vote"),
+    sa.Index("ix_raw_ballot_vote_deputy", "deputy_uid"),
+)

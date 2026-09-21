@@ -138,7 +138,7 @@ uv run alembic upgrade head
 ```text
 src/
 ├── domain/            entités, ports, règles métier — ne dépend de rien (sauf Pydantic)
-│   ├── entities/      Deputy, Law, Debate, Amendment, AssemblyVote, …
+│   ├── entities/      Deputy, Law, Debate, Amendment, Ballot, …
 │   ├── ports/         sources (AN), repositories (raw), projections (public), storage (S3)
 │   └── shared/        SyncReport, validateurs
 ├── application/       cas d'usage — collect_deputies

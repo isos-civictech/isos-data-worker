@@ -12,12 +12,14 @@ from loguru import logger
 from src.composition import (
     build_collect_agenda,
     build_collect_amendments,
+    build_collect_ballots,
     build_collect_debates,
     build_collect_deputies,
     build_collect_laws,
     build_engine,
     build_project_agenda,
     build_project_amendments,
+    build_project_ballots,
     build_project_debates,
     build_project_deputies,
     build_project_laws,
@@ -129,6 +131,28 @@ async def _project_amendments(args) -> SyncReport:
         await engine.dispose()
 
 
+async def _collect_ballots(args) -> SyncReport:
+    settings = get_settings()
+    engine = build_engine(settings)
+    try:
+        async with build_collect_ballots(settings, engine, dry_run=args.dry_run) as use_case:
+            if args.uid:
+                return await use_case.execute_one(args.uid, args.legislature)
+            return await use_case.execute(
+                args.legislature, since=args.since, until=args.until, limit=args.limit
+            )
+    finally:
+        await engine.dispose()
+
+
+async def _project_ballots(args) -> SyncReport:
+    engine = build_engine(get_settings())
+    try:
+        return await build_project_ballots(engine).execute(args.legislature)
+    finally:
+        await engine.dispose()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="isos-data-worker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -209,6 +233,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     project_am.add_argument("--legislature", type=int, default=None)
     project_am.set_defaults(handler=_project_amendments)
+
+    collect_b = sub.add_parser("collect-ballots", help="Assemblée nationale → raw.ballot")
+    collect_b.add_argument("--legislature", type=int, default=None)
+    collect_b.add_argument("--uid", default=None, help="replay a single scrutin (VTAN…)")
+    collect_b.add_argument("--date", type=date.fromisoformat, default=None, help="one day")
+    collect_b.add_argument("--since", type=date.fromisoformat, default=None)
+    collect_b.add_argument("--until", type=date.fromisoformat, default=None)
+    collect_b.add_argument("--limit", type=int, default=None)
+    collect_b.add_argument("--dry-run", action="store_true")
+    collect_b.set_defaults(handler=_collect_ballots)
+
+    project_b = sub.add_parser(
+        "project-ballots", help="raw.ballot → public.ballot, deputy_vote (no network)"
+    )
+    project_b.add_argument("--legislature", type=int, default=None)
+    project_b.set_defaults(handler=_project_ballots)
 
     return parser
 

@@ -130,3 +130,33 @@ amendment = sa.Table(
     sa.Column("external_id", sa.String(100)),
     sa.Column("updated_at", sa.DateTime(timezone=True)),
 )
+
+ballot = sa.Table(
+    "ballot",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("debate_id", sa.Integer, nullable=False),
+    sa.Column("law_id", sa.Integer),
+    sa.Column("amendment_id", sa.Integer),
+    sa.Column("law_reading_id", sa.Integer),
+    sa.Column("type", pg.ENUM(name="ballot_type", create_type=False), nullable=False),
+    sa.Column("title", sa.Text),
+    sa.Column("calendar_status", pg.ENUM(name="event_status", create_type=False), nullable=False),
+    sa.Column("ballot_date", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("result", pg.ENUM(name="ballot_result", create_type=False)),
+    sa.Column("votes_for", sa.Integer),
+    sa.Column("votes_against", sa.Integer),
+    sa.Column("abstention_count", sa.Integer),
+    sa.Column("external_id", sa.String(100)),
+)
+
+deputy_vote = sa.Table(
+    "deputy_vote",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("ballot_id", sa.Integer, nullable=False),
+    sa.Column("deputy_id", sa.Integer, nullable=False),
+    sa.Column("political_group_id", sa.Integer),
+    sa.Column("position", pg.ENUM(name="vote_position", create_type=False), nullable=False),
+    sa.Column("updated_at", sa.DateTime(timezone=True)),
+)
