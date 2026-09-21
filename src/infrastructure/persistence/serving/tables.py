@@ -118,7 +118,7 @@ amendment = sa.Table(
     sa.Column("law_id", sa.Integer, nullable=False),
     sa.Column("law_reading_id", sa.Integer),
     sa.Column("number", sa.String(20)),
-    sa.Column("examined_by", sa.String(50)),
+    sa.Column("examined_in", sa.String(50)),
     sa.Column("article_ref", sa.String(255)),
     sa.Column(
         "author_type", pg.ENUM(name="amendment_author_type", create_type=False), nullable=False

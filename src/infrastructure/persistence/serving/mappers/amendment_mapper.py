@@ -25,7 +25,7 @@ def amendment_row(
         "law_id": law_id,
         "law_reading_id": reading_id,
         "number": a.number,
-        "examined_by": a.examined_by,
+        "examined_in": a.examined_by,
         "article_ref": (a.article_ref or "")[:255] or None,
         "author_type": AUTHOR_TYPES[a.author_type.value],
         "deputy_id": deputy_id,
