@@ -1,31 +1,42 @@
 """
-AMO10 adapter — deputies and political groups.
+AMO30 adapter — every actor of the legislature: deputies past and present,
+ministers, and the political groups.
 
 Source: {base}/static/openData/repository/{legislature}/amo/
-        deputes_actifs_mandats_actifs_organes/AMO10_deputes_actifs_mandats_actifs_organes.xml.zip
+        tous_acteurs_mandats_organes_xi_legislature/
+        AMO30_tous_acteurs_tous_mandats_tous_organes_historique.xml.zip
+        (~16 MB: 3 100 acteurs, 10 800 organes — of all legislatures, so filter)
 
 The archive uses a default XML namespace; every lookup goes through `_text()`,
-which ignores it. An <acteur> holds several <mandat> nodes: ASSEMBLEE is the
-seat, the active GP one is the group, the rest is ignored.
+which ignores it. An <acteur> holds many <mandat> nodes: ASSEMBLEE ones are
+seats, GP ones the group, MINISTERE ones a government post, the rest is ignored.
 """
+
+from datetime import date
 
 from lxml import etree
 
 from src.domain.entities.deputy import Deputy
+from src.domain.entities.government_role import GovernmentRole
 from src.domain.entities.mandate import Mandate
 from src.domain.entities.political_group import PoliticalGroupRef
 from src.domain.ports.sources.deputy_source import DeputySource
 from src.domain.ports.storage import RawStoragePort
+from src.domain.shared.legislatures import legislature_end, legislature_start
 from src.domain.shared.validators import Legislature
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
 
 ARCHIVE_PATH = (
     "/static/openData/repository/{legislature}/amo/"
-    "deputes_actifs_mandats_actifs_organes/"
-    "AMO10_deputes_actifs_mandats_actifs_organes.xml.zip"
+    "tous_acteurs_mandats_organes_xi_legislature/"
+    "AMO30_tous_acteurs_tous_mandats_tous_organes_historique.xml.zip"
 )
 GROUP_CODE_TYPE = "GP"
+SEAT = "ASSEMBLEE"
+MINISTRY = "MINISTERE"
+XSI_TYPE = "{http://www.w3.org/2001/XMLSchema-instance}type"
+POST_MANDATE_TYPE = "MandatSimple_Type"  # a MandatMission_Type is "en mission", not a post
 # Official portraits, not in the archive but derivable from the uid.
 PHOTO_URL = "https://www2.assemblee-nationale.fr/static/tribun/{legislature}/photos/{number}.jpg"
 
@@ -48,8 +59,20 @@ def _int(node, path: str) -> int | None:
         return None
 
 
-def _is_active(mandat) -> bool:
-    return _text(mandat, "dateFin") is None
+def _date(node, path: str) -> date | None:
+    raw = _text(node, path)
+    try:
+        return date.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def _overlaps(mandat, start: date | None, end: date | None) -> bool:
+    """Does the mandat's period intersect [start, end]? Open ends never close."""
+    m_start, m_end = _date(mandat, "dateDebut"), _date(mandat, "dateFin")
+    return (end is None or m_start is None or m_start <= end) and (
+        start is None or m_end is None or m_end >= start
+    )
 
 
 def _gender(civ: str | None) -> str | None:
@@ -63,6 +86,7 @@ class AnDeputyAdapter(DeputySource):
         self._storage = storage
         self._base_url = base_url.rstrip("/")
         self._cache: dict[int, bytes] = {}
+        self._organe_names: dict[int, dict[str, str]] = {}
         self.last_s3_key: str | None = None
 
     def archive_url(self, legislature: int) -> str:
@@ -73,12 +97,24 @@ class AnDeputyAdapter(DeputySource):
         if legislature not in self._cache:
             payload = await self._http.get_bytes(self.archive_url(legislature))
             self.last_s3_key = await self._storage.put(
-                f"raw/deputies/{legislature}/AMO10.xml.zip",
+                f"raw/deputies/{legislature}/AMO30.xml.zip",
                 payload,
                 content_type="application/zip",
             )
             self._cache[legislature] = payload
         return self._cache[legislature]
+
+    def _organes(self, legislature: int, payload: bytes) -> dict[str, str]:
+        """uid -> libelle for every organe, to name ministries."""
+        if legislature not in self._organe_names:
+            names = {}
+            for _, content in iter_zip_members(payload, prefix="xml/organe/", suffix=".xml"):
+                root = etree.fromstring(content)
+                uid, name = _text(root, "uid"), _text(root, "libelle")
+                if uid and name:
+                    names[uid] = name
+            self._organe_names[legislature] = names
+        return self._organe_names[legislature]
 
     async def fetch_political_groups(self, legislature: Legislature) -> list[PoliticalGroupRef]:
         payload = await self._archive(legislature)
@@ -86,23 +122,26 @@ class AnDeputyAdapter(DeputySource):
             self._parse_organe(content)
             for _, content in iter_zip_members(payload, prefix="xml/organe/", suffix=".xml")
         )
-        return [g for g in groups if g is not None]
+        return [g for g in groups if g is not None and g.legislature == legislature]
 
     async def fetch_all(self, legislature: Legislature, limit: int | None = None) -> list[Deputy]:
         payload = await self._archive(legislature)
-        deputies = (
-            self._parse_acteur(content, legislature)
-            for _, content in iter_zip_members(
-                payload, prefix="xml/acteur/", suffix=".xml", limit=limit
-            )
-        )
-        return [d for d in deputies if d is not None]
+        organes = self._organes(legislature, payload)
+        deputies: list[Deputy] = []
+        for _, content in iter_zip_members(payload, prefix="xml/acteur/", suffix=".xml"):
+            deputy = self._parse_acteur(content, legislature, organes)
+            if deputy is None:
+                continue
+            deputies.append(deputy)
+            if limit is not None and len(deputies) >= limit:
+                break
+        return deputies
 
     async def fetch_by_uid(self, uid: str, legislature: Legislature) -> Deputy | None:
         payload = await self._archive(legislature)
         for name, content in iter_zip_members(payload, prefix=f"xml/acteur/{uid}"):
             if name.endswith(f"{uid}.xml"):
-                return self._parse_acteur(content, legislature)
+                return self._parse_acteur(content, legislature, self._organes(legislature, payload))
         return None
 
     # -- parsing: pure functions, covered by tests/adapters --------------------
@@ -123,7 +162,10 @@ class AnDeputyAdapter(DeputySource):
         )
 
     @classmethod
-    def _parse_acteur(cls, xml: bytes, legislature: int) -> Deputy | None:
+    def _parse_acteur(
+        cls, xml: bytes, legislature: int, organes: dict[str, str] | None = None
+    ) -> Deputy | None:
+        """None when the actor played no part in this legislature (AMO30 has them all)."""
         root = etree.fromstring(xml)
         civil = root.find("{*}etatCivil/{*}ident")
 
@@ -133,7 +175,10 @@ class AnDeputyAdapter(DeputySource):
         if not uid or not first_name or not last_name:
             return None
 
-        mandate = cls._build_mandate(root, uid, legislature)
+        mandates = cls._build_mandates(root, uid, legislature)
+        roles = cls._build_government_roles(root, uid, legislature, organes or {})
+        if not mandates and not roles:
+            return None
 
         return Deputy(
             uid=uid,
@@ -143,36 +188,73 @@ class AnDeputyAdapter(DeputySource):
             gender=_gender(_text(civil, "civ")),
             profession=_text(root, "profession/libelleCourant"),
             photo_url=PHOTO_URL.format(legislature=legislature, number=uid.removeprefix("PA")),
-            mandates=[mandate] if mandate else [],
+            mandates=mandates,
+            government_roles=roles,
         )
 
     @staticmethod
-    def _build_mandate(acteur, deputy_uid: str, legislature: int) -> Mandate | None:
-        """Seat from the ASSEMBLEE mandat, group from the active GP mandat."""
-        seat = group = None
-        for mandat in acteur.findall("{*}mandats/{*}mandat"):
-            kind = _text(mandat, "typeOrgane")
-            if kind == "ASSEMBLEE" and seat is None:
-                seat = mandat
-            elif kind == GROUP_CODE_TYPE and _is_active(mandat):
-                group = mandat
+    def _build_mandates(acteur, deputy_uid: str, legislature: int) -> list[Mandate]:
+        """One Mandate per ASSEMBLEE seat of the legislature, with its overlapping group."""
+        mandats = acteur.findall("{*}mandats/{*}mandat")
+        seats = [
+            m
+            for m in mandats
+            if _text(m, "typeOrgane") == SEAT and _int(m, "legislature") == legislature
+        ]
+        groups = [
+            m
+            for m in mandats
+            if _text(m, "typeOrgane") == GROUP_CODE_TYPE and _int(m, "legislature") == legislature
+        ]
+        out = []
+        for seat in seats:
+            uid = _text(seat, "uid")
+            if not uid:
+                continue
+            start, end = _date(seat, "dateDebut"), _date(seat, "dateFin")
+            overlapping = [g for g in groups if _overlaps(g, start, end)]
+            group = max(overlapping, key=lambda g: _date(g, "dateDebut") or date.min, default=None)
+            place = seat.find("{*}election/{*}lieu")
+            out.append(
+                Mandate(
+                    uid=uid,
+                    deputy_uid=deputy_uid,
+                    legislature=legislature,
+                    mandate_start=start,
+                    mandate_end=end,
+                    group_uid=_text(group, "organes/organeRef"),
+                    constituency_number=_int(place, "numCirco"),
+                    department_name=_text(place, "departement"),
+                    department_number=_text(place, "numDepartement"),
+                    seat_number=_int(seat, "mandature/placeHemicycle"),
+                )
+            )
+        out.sort(key=lambda m: m.mandate_start or date.min)
+        return out
 
-        if seat is None:
-            return None
-        uid = _text(seat, "uid")
-        if not uid:
-            return None
-
-        place = seat.find("{*}election/{*}lieu")
-        return Mandate(
-            uid=uid,
-            deputy_uid=deputy_uid,
-            legislature=_int(seat, "legislature") or legislature,
-            mandate_start=_text(seat, "dateDebut"),
-            mandate_end=_text(seat, "dateFin"),
-            group_uid=_text(group, "organes/organeRef"),
-            constituency_number=_int(place, "numCirco"),
-            department_name=_text(place, "departement"),
-            department_number=_text(place, "numDepartement"),
-            seat_number=_int(seat, "mandature/placeHemicycle"),
-        )
+    @staticmethod
+    def _build_government_roles(
+        acteur, deputy_uid: str, legislature: int, organes: dict[str, str]
+    ) -> list[GovernmentRole]:
+        """MINISTERE posts overlapping the legislature (they carry no legislature field)."""
+        since, until = legislature_start(legislature), legislature_end(legislature)
+        roles = []
+        for m in acteur.findall("{*}mandats/{*}mandat"):
+            if _text(m, "typeOrgane") != MINISTRY or m.get(XSI_TYPE) != POST_MANDATE_TYPE:
+                continue
+            if not _overlaps(m, since, until) or not _text(m, "uid"):
+                continue
+            ministry_uid = _text(m, "organes/organeRef")
+            roles.append(
+                GovernmentRole(
+                    uid=_text(m, "uid"),
+                    deputy_uid=deputy_uid,
+                    title=_text(m, "infosQualite/libQualiteSex"),
+                    ministry_uid=ministry_uid,
+                    ministry=organes.get(ministry_uid or ""),
+                    start=_date(m, "dateDebut"),
+                    end=_date(m, "dateFin"),
+                )
+            )
+        roles.sort(key=lambda r: r.start or date.min)
+        return roles

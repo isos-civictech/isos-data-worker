@@ -97,10 +97,10 @@ deputy = sa.Table(
     sa.Column("first_name", sa.Text, nullable=False),
     sa.Column("last_name", sa.Text, nullable=False),
     sa.Column("birth_date", sa.Date),
-    # No column for these in the display schema; raw keeps them anyway.
     sa.Column("gender", sa.String(1)),
     sa.Column("profession", sa.Text),
     sa.Column("photo_url", sa.Text),
+    sa.Column("is_deputy", sa.Boolean, nullable=False, server_default=sa.true()),
     *_seen_columns(),
     sa.Index("ix_raw_deputy_legislature", "legislature"),
 )
@@ -119,13 +119,31 @@ mandate = sa.Table(
     sa.Column("legislature", sa.Integer, nullable=False),
     sa.Column("mandate_start", sa.Date),
     sa.Column("mandate_end", sa.Date),
-    # From the GP mandat (see mandate.py).
     sa.Column("group_uid", sa.String(100)),  # name and acronym: join political_group
     sa.Column("constituency_number", sa.Integer),
     sa.Column("department_name", sa.Text),
     sa.Column("department_number", sa.String(10)),
     sa.Column("seat_number", sa.Integer),
     sa.Index("ix_raw_mandate_deputy", "deputy_uid"),
+)
+
+government_role = sa.Table(
+    "government_role",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),
+    sa.Column(
+        "deputy_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.deputy.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("title", sa.Text),  # "Ministre déléguée", "Secrétaire d'État"
+    sa.Column("ministry_uid", sa.String(100)),
+    sa.Column("ministry", sa.Text),
+    sa.Column("start", sa.Date),
+    sa.Column("end", sa.Date),
+    sa.Index("ix_raw_government_role_deputy", "deputy_uid"),
 )
 
 
@@ -149,8 +167,6 @@ law = sa.Table(
     *_seen_columns(),
 )
 
-# One row per top-level acte: a reading in a chamber, the CMP, the CC, the
-# promulgation. The nested acts are summarised into dates and a decision.
 law_stage = sa.Table(
     "law_stage",
     metadata,

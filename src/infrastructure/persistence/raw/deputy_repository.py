@@ -1,6 +1,6 @@
 """
-Deputy persistence in `raw`. One transaction per deputy: the deputy and its
-mandates land together or not at all.
+Deputy persistence in `raw`. One transaction per deputy: the deputy, its
+seats and its government posts land together or not at all.
 """
 
 from typing import Any
@@ -17,6 +17,7 @@ from src.infrastructure.persistence.engine import transaction
 from src.infrastructure.persistence.raw import tables
 from src.infrastructure.persistence.raw.mappers.deputy_mapper import (
     deputy_row,
+    government_role_row,
     mandate_row,
     political_group_row,
 )
@@ -69,6 +70,12 @@ class SqlRawDeputyRepository(DeputyRepository):
             for mandate in deputy.mandates:
                 await connection.execute(
                     _upsert(tables.mandate, mandate_row(mandate), key="uid", tracked=False)
+                )
+            for role in deputy.government_roles:
+                await connection.execute(
+                    _upsert(
+                        tables.government_role, government_role_row(role), key="uid", tracked=False
+                    )
                 )
         return SaveOutcome(entity_id=deputy_id, created=created)
 

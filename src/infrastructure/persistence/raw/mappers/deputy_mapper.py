@@ -6,6 +6,7 @@ resolution. Fields the display schema lacks (gender, profession) are kept.
 from typing import Any
 
 from src.domain.entities.deputy import Deputy
+from src.domain.entities.government_role import GovernmentRole
 from src.domain.entities.mandate import Mandate
 from src.domain.entities.political_group import PoliticalGroupRef
 
@@ -30,6 +31,7 @@ def deputy_row(deputy: Deputy, *, legislature: int) -> dict[str, Any]:
         "profession": deputy.profession,
         # HttpUrl is not a str for asyncpg.
         "photo_url": str(deputy.photo_url) if deputy.photo_url else None,
+        "is_deputy": deputy.is_deputy,
     }
 
 
@@ -45,4 +47,16 @@ def mandate_row(mandate: Mandate) -> dict[str, Any]:
         "department_name": mandate.department_name,
         "department_number": mandate.department_number,
         "seat_number": mandate.seat_number,
+    }
+
+
+def government_role_row(role: GovernmentRole) -> dict[str, Any]:
+    return {
+        "uid": role.uid,
+        "deputy_uid": role.deputy_uid,
+        "title": role.title,
+        "ministry_uid": role.ministry_uid,
+        "ministry": role.ministry,
+        "start": role.start,
+        "end": role.end,
     }

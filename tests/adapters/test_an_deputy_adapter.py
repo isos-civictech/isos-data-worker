@@ -1,4 +1,4 @@
-"""Parsing tests against trimmed real AMO10 files. Assertions are on entities."""
+"""Parsing tests against trimmed real AMO files. Assertions are on entities."""
 
 import io
 import zipfile
@@ -125,7 +125,7 @@ async def test_raw_archive_is_kept_for_traceability(storage):
         adapter = AnDeputyAdapter(http, storage, BASE)
         await adapter.fetch_all(17)
 
-    assert "raw/deputies/17/AMO10.xml.zip" in storage.objects
+    assert "raw/deputies/17/AMO30.xml.zip" in storage.objects
 
 
 @respx.mock
@@ -148,3 +148,32 @@ async def test_limit_stops_early(storage):
     async with HttpClient() as http:
         adapter = AnDeputyAdapter(http, storage, BASE)
         assert len(await adapter.fetch_all(17, limit=1)) == 1
+
+
+def test_minister_with_two_seats_in_the_legislature():
+    """Real AMO30 case: left for the government, came back, then left again."""
+    organes = {"PO873654": "Ministère des sports", "PO847734": "Ministère délégué au tourisme"}
+    deputy = AnDeputyAdapter._parse_acteur(
+        (FIXTURES / "acteur_PA795120_minister.xml").read_bytes(), 17, organes
+    )
+    assert deputy.uid == "PA795120" and deputy.is_deputy and deputy.is_minister
+    assert [m.uid for m in deputy.mandates] == ["PM858429", "PM843344"] or [
+        m.uid for m in deputy.mandates
+    ] == ["PM843344", "PM858429"]
+    assert all(m.group_uid == "PO845454" for m in deputy.mandates), "group overlaps each seat"
+    # The first post started under the 16th but ran into the 17th: kept.
+    assert [r.uid for r in deputy.government_roles] == ["PM834789", "PM847787", "PM873690"]
+    current = deputy.government_roles[-1]
+    assert (current.title, current.ministry, current.end) == (
+        "Ministre",
+        "Ministère des sports",
+        None,
+    )
+
+
+def test_actor_outside_the_legislature_is_skipped():
+    """AMO30 lists every actor since 1958: only those with a part in this legislature matter."""
+    deputy = AnDeputyAdapter._parse_acteur(
+        (FIXTURES / "acteur_PA795120_minister.xml").read_bytes(), 15, {}
+    )
+    assert deputy is None, "no seat in the 15th, and the posts all ended before the 17th opened"

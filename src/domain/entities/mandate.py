@@ -1,15 +1,13 @@
 """
 Mandate entity — represents a deputy's term in a specific legislature.
 
-Sources:
-    ZIP (XML): https://data.assemblee-nationale.fr/static/openData/repository/
-            {legislature}/amo/deputes_actifs_mandats_actifs_organes/
-            AMO10_deputes_actifs_mandats_actifs_organes.xml.zip
+Source: AMO30 (see deputy.py). An actor can hold several seats in one
+legislature (left for the government, came back): each is a Mandate.
 
-    typeOrgane = ASSEMBLEE  → the seat. Source of uid, dates, geography, preseance.
-    typeOrgane = GP         → the political group. Source of group_uid only.
-                              A deputy who switches group has two GP mandats:
-                              take the active one (dateFin empty or in the future).
+    typeOrgane = ASSEMBLEE  → the seat. Source of uid, dates, geography.
+    typeOrgane = GP         → the political group. Source of group_uid only:
+                              the GP mandat of the same legislature whose dates
+                              overlap the seat (latest one if several).
     typeOrgane = GA / COMPER / COMNL / MISINFO / …  → ignored.
 
 The XML uses a DEFAULT NAMESPACE (http://schemas.assemblee-nationale.fr/referentiel).
@@ -27,7 +25,7 @@ XML field mapping (inside acteur/PA{id}.xml):
     department_name      → mandat/election/lieu/departement
     department_number    → mandat/election/lieu/numDepartement
 
-    -- from the active GP mandat --
+    -- from the overlapping GP mandat --
     group_uid            → mandat/organes/organeRef                  ("PO123456")
     group_acronym        → organe/PO{id}.xml/libelleAbrege           (may be empty)
     group_name           → organe/PO{id}.xml/libelle
