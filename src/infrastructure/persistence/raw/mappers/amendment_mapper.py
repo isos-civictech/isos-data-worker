@@ -14,7 +14,7 @@ def amendment_row(a: Amendment) -> dict[str, Any]:
         "examen_ref": a.examen_ref,
         "number": a.number,
         "rectification": a.rectification,
-        "examined_in": a.examined_by,
+        "examined_by": a.examined_by,
         "parent_uid": a.parent_uid,
         "author_type": a.author_type.value,
         "deputy_uid": a.deputy_uid,

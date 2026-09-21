@@ -33,7 +33,9 @@ class CollectBallots:
         since: date | None = None,
         until: date | None = None,
         limit: int | None = None,
+        agenda_uids: set[str] | None = None,
     ) -> SyncReport:
+        """`agenda_uids`: keep only the scrutins of these sittings (a scoped sync)."""
         report = SyncReport(entity=ENTITY)
         source_url = getattr(self._source, "archive_url", lambda _: None)(legislature)
         run_id = await self._log.start_run(ENTITY, source_url=source_url)
@@ -47,6 +49,8 @@ class CollectBallots:
             self._dry_run,
         )
         ballots = await self._source.fetch_all(legislature, since=since, until=until, limit=limit)
+        if agenda_uids is not None:
+            ballots = [b for b in ballots if b.agenda_uid in agenda_uids]
         await self._save_all(ballots, run_id, report)
         report.finish()
         await self._log.finish_run(run_id, report)

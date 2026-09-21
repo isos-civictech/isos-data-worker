@@ -24,7 +24,10 @@ class CollectLaws:
         self._log = log_repository
         self._dry_run = dry_run
 
-    async def execute(self, legislature: int, limit: int | None = None) -> SyncReport:
+    async def execute(
+        self, legislature: int, limit: int | None = None, dossier_uids: set[str] | None = None
+    ) -> SyncReport:
+        """`dossier_uids`: keep only these dossiers (a scoped sync)."""
         report = SyncReport(entity=ENTITY)
         source_url = getattr(self._source, "archive_url", lambda _: None)(legislature)
         run_id = await self._log.start_run(ENTITY, source_url=source_url)
@@ -37,6 +40,8 @@ class CollectLaws:
         )
 
         laws = await self._source.fetch_all(legislature, limit=limit)
+        if dossier_uids is not None:
+            laws = [law for law in laws if law.dossier_uid in dossier_uids]
         await self._save_all(laws, run_id, report)
 
         report.finish()

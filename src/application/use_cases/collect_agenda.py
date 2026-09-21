@@ -1,6 +1,6 @@
 """Collect the sittings agenda from the Assemblée nationale into `raw`."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 from loguru import logger
 
@@ -32,7 +32,9 @@ class CollectAgenda:
         limit: int | None = None,
         since: date | None = None,
         until: date | None = None,
+        last: int | None = None,
     ) -> SyncReport:
+        """`last`: keep only the N most recent sittings already started (a scoped sync)."""
         report = SyncReport(entity=ENTITY)
         source_url = getattr(self._source, "archive_url", lambda _: None)(legislature)
         run_id = await self._log.start_run(ENTITY, source_url=source_url)
@@ -47,6 +49,9 @@ class CollectAgenda:
         )
 
         items = await self._source.fetch_all(legislature, limit=limit, since=since, until=until)
+        if last is not None:
+            now = datetime.now(tz=UTC)
+            items = [i for i in items if i.start_at <= now][-last:]
         s3_key = getattr(self._source, "last_s3_key", None)
 
         for item in items:

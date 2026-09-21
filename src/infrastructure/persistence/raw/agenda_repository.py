@@ -1,9 +1,12 @@
 """Scheduled-sitting persistence in `raw`. One transaction per sitting."""
 
+from datetime import datetime
+
+import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from src.domain.entities.agenda_item import AgendaItem
-from src.domain.ports.repositories.agenda_repository import AgendaRepository
+from src.domain.ports.repositories.agenda_repository import AgendaRepository, SittingLink
 from src.domain.shared.results import SaveOutcome
 from src.infrastructure.persistence.engine import transaction
 from src.infrastructure.persistence.raw import tables
@@ -31,3 +34,31 @@ class SqlRawAgendaRepository(AgendaRepository):
             if points:
                 await connection.execute(_bulk_upsert(tables.agenda_point, points, key="point_uid"))
         return SaveOutcome(entity_id=item_id, created=created)
+
+    async def latest_held(
+        self, legislature: int, count: int, before: datetime
+    ) -> list[SittingLink]:
+        item, point = tables.agenda_item, tables.agenda_point
+        latest = (
+            sa.select(item.c.uid, item.c.compte_rendu_uid)
+            .where(item.c.legislature == legislature, item.c.start_at < before)
+            .order_by(item.c.start_at.desc())
+            .limit(count)
+        )
+        async with self._engine.connect() as connection:
+            sittings = (await connection.execute(latest)).all()
+            uids = [uid for uid, _ in sittings]
+            refs = (
+                await connection.execute(
+                    sa.select(point.c.agenda_uid, point.c.dossier_refs).where(
+                        point.c.agenda_uid.in_(uids)
+                    )
+                )
+            ).all()
+        dossiers: dict[str, set[str]] = {}
+        for agenda_uid, dossier_refs in refs:
+            dossiers.setdefault(agenda_uid, set()).update(d for d in dossier_refs if d)
+        return [
+            SittingLink(uid, compte_rendu, frozenset(dossiers.get(uid, ())))
+            for uid, compte_rendu in sittings
+        ]

@@ -17,9 +17,11 @@ from lxml import etree
 from src.domain.entities.debate import Debate, SessionType
 from src.domain.entities.debate_point import DebatePoint
 from src.domain.entities.intervention import Intervention, SpeakerType
+from src.domain.ports.sources.archive_source import ArchiveSource
 from src.domain.ports.sources.debate_source import DebateSource
 from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.validators import Legislature
+from src.infrastructure.adapters.archive_cache import load_archive
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
 
@@ -88,26 +90,45 @@ def _speaker_type(deputy_uid: str | None, name: str | None, quality: str | None)
     return SpeakerType.OTHER
 
 
-class AnDebateAdapter(DebateSource):
-    def __init__(self, http: HttpClient, storage: RawStoragePort, base_url: str) -> None:
+class AnDebateAdapter(DebateSource, ArchiveSource):
+    def __init__(
+        self, http: HttpClient, storage: RawStoragePort, base_url: str, *, refresh: bool = False
+    ) -> None:
         self._http = http
         self._storage = storage
         self._base_url = base_url.rstrip("/")
         self._cache: dict[int, bytes] = {}
+        self._refresh = refresh
         self.last_s3_key: str | None = None
 
     def archive_url(self, legislature: int) -> str:
         return self._base_url + ARCHIVE_PATH.format(legislature=legislature)
 
+    def archive_key(self, legislature: int) -> str:
+        return f"raw/debates/{legislature}/syceron.xml.zip"
+
+    async def refresh_archive(self, legislature: int) -> str:
+        self._cache[legislature] = await load_archive(
+            self._http,
+            self._storage,
+            url=self.archive_url(legislature),
+            key=self.archive_key(legislature),
+            refresh=True,
+        )
+        return self.archive_key(legislature)
+
     async def _archive(self, legislature: int) -> bytes:
+        # One archive per legislature, read once per run; S3 first, the AN site otherwise.
         if legislature not in self._cache:
-            payload = await self._http.get_bytes(self.archive_url(legislature))
-            self.last_s3_key = await self._storage.put(
-                f"raw/debates/{legislature}/syceron.xml.zip",
-                payload,
+            self._cache[legislature] = await load_archive(
+                self._http,
+                self._storage,
+                url=self.archive_url(legislature),
+                key=self.archive_key(legislature),
                 content_type="application/zip",
+                refresh=self._refresh,
             )
-            self._cache[legislature] = payload
+            self.last_s3_key = self.archive_key(legislature)
         return self._cache[legislature]
 
     async def fetch_all(

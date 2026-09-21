@@ -37,7 +37,9 @@ class CollectDebates:
         limit: int | None = None,
         since: date | None = None,
         until: date | None = None,
+        uids: set[str] | None = None,
     ) -> SyncReport:
+        """`uids`: keep only these comptes rendus (a scoped sync)."""
         report = SyncReport(entity=ENTITY)
         source_url = getattr(self._source, "archive_url", lambda _: None)(legislature)
         run_id = await self._log.start_run(ENTITY, source_url=source_url)
@@ -52,6 +54,8 @@ class CollectDebates:
         )
 
         debates = await self._source.fetch_all(legislature, limit=limit, since=since, until=until)
+        if uids is not None:
+            debates = [d for d in debates if d.uid in uids]
         s3_key = getattr(self._source, "last_s3_key", None)
 
         for debate in debates:

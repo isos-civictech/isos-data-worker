@@ -5,6 +5,7 @@ Composition root — the only module that imports both `infrastructure` and
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -22,6 +23,8 @@ from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.application.use_cases.project_law_texts import ProjectLawTexts
 from src.application.use_cases.project_laws import ProjectLaws
+from src.application.use_cases.refresh_archives import RefreshArchives
+from src.application.use_cases.sync_all import SyncAll
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
 from src.infrastructure.adapters.an_agenda_adapter import AnAgendaAdapter
@@ -52,6 +55,9 @@ from src.infrastructure.persistence.serving.law_projection import SqlLawProjecti
 from src.infrastructure.persistence.serving.law_text_projection import SqlLawTextProjection
 from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
 
+# The biggest archives (amendments 340 MB, debates 55 MB) need a longer timeout.
+LONG_TIMEOUT_S = 600.0
+
 
 def build_engine(settings: Settings) -> AsyncEngine:
     return create_engine(settings.database_url)
@@ -72,170 +78,114 @@ def build_storage(settings: Settings) -> RawStoragePort:
     )
 
 
+@dataclass
+class Worker:
+    """Every use case, wired once. `refresh` re-downloads archives, `dry_run` writes nothing."""
+
+    collect_deputies: CollectDeputies
+    collect_laws: CollectLaws
+    collect_agenda: CollectAgenda
+    collect_debates: CollectDebates
+    collect_amendments: CollectAmendments
+    collect_ballots: CollectBallots
+    collect_law_texts: CollectLawTexts
+    project_deputies: ProjectDeputies
+    project_laws: ProjectLaws
+    project_agenda: ProjectAgenda
+    project_debates: ProjectDebates
+    project_amendments: ProjectAmendments
+    project_ballots: ProjectBallots
+    project_law_texts: ProjectLawTexts
+    refresh_archives: RefreshArchives
+    sync_all: SyncAll
+
+
 @asynccontextmanager
-async def build_collect_deputies(
+async def build_worker(
     settings: Settings,
     engine: AsyncEngine,
     *,
     dry_run: bool = False,
-) -> AsyncIterator[CollectDeputies]:
+    refresh: bool = False,
+) -> AsyncIterator[Worker]:
     storage = build_storage(settings)
+    log = SqlIngestionLogRepository(engine)
+    base = settings.an_base_url
     async with HttpClient(
-        timeout_s=settings.http_timeout_s,
+        timeout_s=max(settings.http_timeout_s, LONG_TIMEOUT_S),
         max_attempts=settings.http_max_attempts,
     ) as http:
-        yield CollectDeputies(
-            source=AnDeputyAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawDeputyRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
+        deputies = AnDeputyAdapter(http, storage, base, refresh=refresh)
+        laws = AnLawAdapter(http, storage, base, refresh=refresh)
+        agenda = AnAgendaAdapter(http, storage, base, refresh=refresh)
+        debates = AnDebateAdapter(http, storage, base, refresh=refresh)
+        amendments = AnAmendmentAdapter(http, storage, base, refresh=refresh)
+        ballots = AnBallotAdapter(http, storage, base, refresh=refresh)
+        law_texts = AnLawTextAdapter(http, storage, refresh=refresh)
+
+        agenda_repository = SqlRawAgendaRepository(engine)
+        collect = dict(
+            collect_deputies=CollectDeputies(
+                source=deputies,
+                repository=SqlRawDeputyRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
+            collect_laws=CollectLaws(
+                source=laws,
+                repository=SqlRawLawRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
+            collect_agenda=CollectAgenda(
+                source=agenda, repository=agenda_repository, log_repository=log, dry_run=dry_run
+            ),
+            collect_debates=CollectDebates(
+                source=debates,
+                repository=SqlRawDebateRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
+            collect_amendments=CollectAmendments(
+                source=amendments,
+                repository=SqlRawAmendmentRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
+            collect_ballots=CollectBallots(
+                source=ballots,
+                repository=SqlRawBallotRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
+            collect_law_texts=CollectLawTexts(
+                source=law_texts,
+                repository=SqlRawLawTextRepository(engine),
+                log_repository=log,
+                dry_run=dry_run,
+            ),
         )
-
-
-def build_project_deputies(engine: AsyncEngine) -> ProjectDeputies:
-    return ProjectDeputies(projection=SqlDeputyProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_debates(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectDebates]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        # The Syceron archive is ~55 MB: give it more room than the default.
-        timeout_s=max(settings.http_timeout_s, 120.0),
-        max_attempts=settings.http_max_attempts,
-    ) as http:
-        yield CollectDebates(
-            source=AnDebateAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawDebateRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
+        project = dict(
+            project_deputies=ProjectDeputies(projection=SqlDeputyProjection(engine)),
+            project_laws=ProjectLaws(projection=SqlLawProjection(engine)),
+            project_agenda=ProjectAgenda(projection=SqlAgendaProjection(engine)),
+            project_debates=ProjectDebates(projection=SqlDebateProjection(engine)),
+            project_amendments=ProjectAmendments(projection=SqlAmendmentProjection(engine)),
+            project_ballots=ProjectBallots(projection=SqlBallotProjection(engine)),
+            project_law_texts=ProjectLawTexts(projection=SqlLawTextProjection(engine)),
         )
-
-
-def build_project_debates(engine: AsyncEngine) -> ProjectDebates:
-    return ProjectDebates(projection=SqlDebateProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_agenda(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectAgenda]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        timeout_s=settings.http_timeout_s, max_attempts=settings.http_max_attempts
-    ) as http:
-        yield CollectAgenda(
-            source=AnAgendaAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawAgendaRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
+        yield Worker(
+            **collect,
+            **project,
+            refresh_archives=RefreshArchives(
+                {
+                    "deputies": deputies,
+                    "laws": laws,
+                    "agenda": agenda,
+                    "debates": debates,
+                    "amendments": amendments,
+                    "ballots": ballots,
+                }
+            ),
+            sync_all=SyncAll(agenda_repository=agenda_repository, **collect, **project),
         )
-
-
-def build_project_agenda(engine: AsyncEngine) -> ProjectAgenda:
-    return ProjectAgenda(projection=SqlAgendaProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_laws(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectLaws]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        # ~37 MB archive.
-        timeout_s=max(settings.http_timeout_s, 120.0),
-        max_attempts=settings.http_max_attempts,
-    ) as http:
-        yield CollectLaws(
-            source=AnLawAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawLawRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
-        )
-
-
-def build_project_laws(engine: AsyncEngine) -> ProjectLaws:
-    return ProjectLaws(projection=SqlLawProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_amendments(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectAmendments]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        # ~340 MB archive.
-        timeout_s=max(settings.http_timeout_s, 600.0),
-        max_attempts=settings.http_max_attempts,
-    ) as http:
-        yield CollectAmendments(
-            source=AnAmendmentAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawAmendmentRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
-        )
-
-
-def build_project_amendments(engine: AsyncEngine) -> ProjectAmendments:
-    return ProjectAmendments(projection=SqlAmendmentProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_ballots(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectBallots]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        timeout_s=max(settings.http_timeout_s, 120.0),
-        max_attempts=settings.http_max_attempts,
-    ) as http:
-        yield CollectBallots(
-            source=AnBallotAdapter(http, storage, settings.an_base_url),
-            repository=SqlRawBallotRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
-        )
-
-
-def build_project_ballots(engine: AsyncEngine) -> ProjectBallots:
-    return ProjectBallots(projection=SqlBallotProjection(engine))
-
-
-@asynccontextmanager
-async def build_collect_law_texts(
-    settings: Settings,
-    engine: AsyncEngine,
-    *,
-    dry_run: bool = False,
-) -> AsyncIterator[CollectLawTexts]:
-    storage = build_storage(settings)
-    async with HttpClient(
-        timeout_s=settings.http_timeout_s, max_attempts=settings.http_max_attempts
-    ) as http:
-        yield CollectLawTexts(
-            source=AnLawTextAdapter(http, storage),
-            repository=SqlRawLawTextRepository(engine),
-            log_repository=SqlIngestionLogRepository(engine),
-            dry_run=dry_run,
-        )
-
-
-def build_project_law_texts(engine: AsyncEngine) -> ProjectLawTexts:
-    return ProjectLawTexts(projection=SqlLawTextProjection(engine))

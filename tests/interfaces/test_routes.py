@@ -98,32 +98,43 @@ def test_jobs_lists_ingestion_runs(client):
 
 
 def test_openapi_is_generated(client):
-    """The front consumes generated types; a broken schema breaks the front."""
+    """The front consumes the schema; a broken schema breaks the front."""
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
     paths = response.json()["paths"]
-    for expected in ("/", "/health", "/health/db", "/jobs", "/collect/deputies"):
+    for expected in ("/", "/health", "/health/db", "/jobs", "/collect/{dataset}"):
         assert expected in paths, f"{expected} is missing from the OpenAPI schema"
 
 
-def test_every_trigger_route_is_exposed(client):
+def test_every_trigger_route_is_a_post(client):
     paths = client.get("/openapi.json").json()["paths"]
     for route in (
-        "/collect/deputies",
-        "/collect/deputies/{uid}",
-        "/project/deputies",
-        "/sync/deputies",
-        "/sync/deputies/{uid}",
-        "/collect/debates",
-        "/project/debates",
-        "/sync/debates",
-        "/sync/debates/{uid}",
-        "/collect/agenda",
-        "/project/agenda",
-        "/sync/agenda",
+        "/collect/{dataset}",
+        "/project/{dataset}",
+        "/sync/{dataset}",
+        "/sync/all",
+        "/refresh",
     ):
         assert "post" in paths[route], f"{route} must be a POST"
+
+
+def test_unknown_dataset_is_a_404(client):
+    assert client.post("/project/senators").status_code == 404
+    assert client.post("/collect/senators").status_code == 404
+
+
+def test_read_routes_are_exposed(client):
+    paths = client.get("/openapi.json").json()["paths"]
+    for route in (
+        "/agenda/today",
+        "/agenda/upcoming",
+        "/laws/{uid}",
+        "/laws/{uid}/amendments",
+        "/laws/{uid}/articles/{article_ref}",
+        "/deputies/{uid}/votes",
+    ):
+        assert "get" in paths[route], f"{route} must be a GET"
 
 
 def test_agenda_read_routes(client):

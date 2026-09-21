@@ -1,61 +1,13 @@
 """Amendment routes: collect, plus a read route listing one dossier's amendments."""
 
-from datetime import date
-
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from src.composition import build_collect_amendments, build_project_amendments
-from src.config import Settings
 from src.infrastructure.persistence.raw import tables as raw
-from src.interfaces.api.dependencies import get_engine, get_settings_dep
+from src.interfaces.api.dependencies import get_engine
 
 router = APIRouter(tags=["amendments"])
-
-
-@router.post("/collect/amendments")
-async def collect_amendments(
-    legislature: int | None = None,
-    dossier: str | None = Query(default=None, description="one dossier only (DLR…)"),
-    since: date | None = Query(default=None, description="deposited on or after, YYYY-MM-DD"),
-    limit: int | None = None,
-    dry_run: bool = False,
-    settings: Settings = Depends(get_settings_dep),
-    engine: AsyncEngine = Depends(get_engine),
-) -> dict:
-    """The archive is ~340 MB: a full run takes a few minutes."""
-    async with build_collect_amendments(settings, engine, dry_run=dry_run) as use_case:
-        report = await use_case.execute(
-            legislature or settings.an_legislature, dossier_uid=dossier, since=since, limit=limit
-        )
-    return report.as_dict()
-
-
-@router.post("/project/amendments")
-async def project_amendments(
-    legislature: int | None = None,
-    settings: Settings = Depends(get_settings_dep),
-    engine: AsyncEngine = Depends(get_engine),
-) -> dict:
-    """Needs public.law and public.deputy: run /sync/laws and /sync/deputies first."""
-    report = await build_project_amendments(engine).execute(legislature or settings.an_legislature)
-    return report.as_dict()
-
-
-@router.post("/sync/amendments")
-async def sync_amendments(
-    legislature: int | None = None,
-    dossier: str | None = Query(default=None),
-    since: date | None = Query(default=None),
-    settings: Settings = Depends(get_settings_dep),
-    engine: AsyncEngine = Depends(get_engine),
-) -> dict:
-    leg = legislature or settings.an_legislature
-    async with build_collect_amendments(settings, engine) as use_case:
-        collected = await use_case.execute(leg, dossier_uid=dossier, since=since)
-    projected = await build_project_amendments(engine).execute(leg)
-    return {"collect": collected.as_dict(), "project": projected.as_dict()}
 
 
 @router.get("/laws/{uid}/amendments")

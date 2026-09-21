@@ -20,10 +20,12 @@ from src.domain.entities.deputy import Deputy
 from src.domain.entities.government_role import GovernmentRole
 from src.domain.entities.mandate import Mandate
 from src.domain.entities.political_group import PoliticalGroupRef
+from src.domain.ports.sources.archive_source import ArchiveSource
 from src.domain.ports.sources.deputy_source import DeputySource
 from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.legislatures import legislature_end, legislature_start
 from src.domain.shared.validators import Legislature
+from src.infrastructure.adapters.archive_cache import load_archive
 from src.infrastructure.http.archive import iter_zip_members
 from src.infrastructure.http.client import HttpClient
 
@@ -80,28 +82,46 @@ def _gender(civ: str | None) -> str | None:
     return {"M.": "M", "Mme": "F"}.get(civ or "")
 
 
-class AnDeputyAdapter(DeputySource):
-    def __init__(self, http: HttpClient, storage: RawStoragePort, base_url: str) -> None:
+class AnDeputyAdapter(DeputySource, ArchiveSource):
+    def __init__(
+        self, http: HttpClient, storage: RawStoragePort, base_url: str, *, refresh: bool = False
+    ) -> None:
         self._http = http
         self._storage = storage
         self._base_url = base_url.rstrip("/")
         self._cache: dict[int, bytes] = {}
+        self._refresh = refresh
         self._organe_names: dict[int, dict[str, str]] = {}
         self.last_s3_key: str | None = None
 
     def archive_url(self, legislature: int) -> str:
         return self._base_url + ARCHIVE_PATH.format(legislature=legislature)
 
+    def archive_key(self, legislature: int) -> str:
+        return f"raw/deputies/{legislature}/AMO30.xml.zip"
+
+    async def refresh_archive(self, legislature: int) -> str:
+        self._cache[legislature] = await load_archive(
+            self._http,
+            self._storage,
+            url=self.archive_url(legislature),
+            key=self.archive_key(legislature),
+            refresh=True,
+        )
+        return self.archive_key(legislature)
+
     async def _archive(self, legislature: int) -> bytes:
-        # Downloaded once, reused for the groups pass and the deputies pass.
+        # One archive per legislature, read once per run; S3 first, the AN site otherwise.
         if legislature not in self._cache:
-            payload = await self._http.get_bytes(self.archive_url(legislature))
-            self.last_s3_key = await self._storage.put(
-                f"raw/deputies/{legislature}/AMO30.xml.zip",
-                payload,
+            self._cache[legislature] = await load_archive(
+                self._http,
+                self._storage,
+                url=self.archive_url(legislature),
+                key=self.archive_key(legislature),
                 content_type="application/zip",
+                refresh=self._refresh,
             )
-            self._cache[legislature] = payload
+            self.last_s3_key = self.archive_key(legislature)
         return self._cache[legislature]
 
     def _organes(self, legislature: int, payload: bytes) -> dict[str, str]:

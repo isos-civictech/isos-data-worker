@@ -26,6 +26,9 @@ class InMemoryStorage(RawStoragePort):
     async def exists(self, key) -> bool:
         return key in self.objects
 
+    async def get(self, key) -> bytes | None:
+        return self.objects.get(key)
+
 
 def _archive() -> bytes:
     buffer = io.BytesIO()

@@ -15,6 +15,7 @@ from src.domain.entities.law_text import LawArticle, LawText
 from src.domain.ports.sources.law_text_source import LawTextSource
 from src.domain.ports.storage import RawStoragePort
 from src.domain.shared.validators import Legislature
+from src.infrastructure.adapters.archive_cache import load_archive
 from src.infrastructure.http.client import HttpClient
 
 DOC_URL = "https://www.assemblee-nationale.fr/dyn/docs/{uid}.raw"
@@ -38,22 +39,25 @@ def _clean(node) -> str:
 
 
 class AnLawTextAdapter(LawTextSource):
-    def __init__(self, http: HttpClient, storage: RawStoragePort) -> None:
+    def __init__(self, http: HttpClient, storage: RawStoragePort, *, refresh: bool = False) -> None:
         self._http = http
         self._storage = storage
+        self._refresh = refresh
         self.last_s3_key: str | None = None
 
     async def fetch(self, texte_uid: str, legislature: Legislature) -> LawText | None:
         url = DOC_URL.format(uid=texte_uid)
+        key = f"raw/law_texts/{legislature}/{texte_uid}.html"
         try:
-            payload = await self._http.get_bytes(url)
+            payload = await load_archive(
+                self._http, self._storage, url=url, key=key, content_type="text/html",
+                refresh=self._refresh,
+            )  # fmt: skip
         except httpx.HTTPStatusError as error:
             if error.response.status_code == 404:
                 return None
             raise
-        self.last_s3_key = await self._storage.put(
-            f"raw/law_texts/{legislature}/{texte_uid}.html", payload, content_type="text/html"
-        )
+        self.last_s3_key = key
         law_text = self._parse(payload, texte_uid, legislature)
         law_text.source_url = url
         return law_text

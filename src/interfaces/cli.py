@@ -1,293 +1,90 @@
 """
-Command line entry point (used by Kubernetes Jobs). Exit code 0 if the run is
-acceptable, 1 otherwise.
+Command line entry point (used by Kubernetes Jobs and the Makefile). Exit code
+0 if the run is acceptable, 1 otherwise.
+
+    collect-<dataset>   Assemblée nationale → raw        (S3 first, --refresh to re-download)
+    project-<dataset>   raw → public                     (SQL only, no network)
+    sync-all            everything in order; --debates N keeps only the N latest sittings
+    refresh             re-download the archives into S3, database untouched
 """
 
 import argparse
 import asyncio
+import json
+from collections.abc import Awaitable, Callable
 from datetime import date
 
 from loguru import logger
 
-from src.composition import (
-    build_collect_agenda,
-    build_collect_amendments,
-    build_collect_ballots,
-    build_collect_debates,
-    build_collect_deputies,
-    build_collect_law_texts,
-    build_collect_laws,
-    build_engine,
-    build_project_agenda,
-    build_project_amendments,
-    build_project_ballots,
-    build_project_debates,
-    build_project_deputies,
-    build_project_law_texts,
-    build_project_laws,
-)
+from src.composition import Worker, build_engine, build_worker
 from src.config import get_settings
-from src.domain.shared.results import SyncReport
+from src.interfaces.dispatch import DATASETS, Selection, collect, project
 from src.logging_setup import setup_logging
 
 
-async def _collect_deputies(args) -> SyncReport:
+async def _run(args, action: Callable[[Worker], Awaitable]):
     settings = get_settings()
     engine = build_engine(settings)
     try:
-        async with build_collect_deputies(settings, engine, dry_run=args.dry_run) as use_case:
-            if args.uid:
-                return await use_case.execute_one(args.uid, args.legislature)
-            return await use_case.execute(args.legislature, limit=args.limit)
+        async with build_worker(
+            settings, engine, dry_run=args.dry_run, refresh=args.refresh
+        ) as worker:
+            return await action(worker)
     finally:
         await engine.dispose()
 
 
-async def _project_deputies(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_deputies(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
+def _collect(args, w: Worker):
+    return collect(
+        w,
+        args.dataset,
+        args.legislature,
+        Selection(
+            limit=args.limit, uid=args.uid, dossier=args.dossier, since=args.since, until=args.until
+        ),
+    )
 
 
-async def _collect_debates(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_debates(settings, engine, dry_run=args.dry_run) as use_case:
-            if args.uid:
-                return await use_case.execute_one(args.uid, args.legislature)
-            return await use_case.execute(
-                args.legislature, limit=args.limit, since=args.since, until=args.until
-            )
-    finally:
-        await engine.dispose()
-
-
-async def _project_debates(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_debates(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
-
-
-async def _collect_agenda(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_agenda(settings, engine, dry_run=args.dry_run) as use_case:
-            return await use_case.execute(
-                args.legislature, limit=args.limit, since=args.since, until=args.until
-            )
-    finally:
-        await engine.dispose()
-
-
-async def _project_agenda(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_agenda(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
-
-
-async def _collect_laws(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_laws(settings, engine, dry_run=args.dry_run) as use_case:
-            if args.uid:
-                return await use_case.execute_one(args.uid, args.legislature)
-            return await use_case.execute(args.legislature, limit=args.limit)
-    finally:
-        await engine.dispose()
-
-
-async def _project_laws(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_laws(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
-
-
-async def _collect_amendments(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_amendments(settings, engine, dry_run=args.dry_run) as use_case:
-            return await use_case.execute(
-                args.legislature, dossier_uid=args.dossier, since=args.since, limit=args.limit
-            )
-    finally:
-        await engine.dispose()
-
-
-async def _project_amendments(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_amendments(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
-
-
-async def _collect_ballots(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_ballots(settings, engine, dry_run=args.dry_run) as use_case:
-            if args.uid:
-                return await use_case.execute_one(args.uid, args.legislature)
-            return await use_case.execute(
-                args.legislature, since=args.since, until=args.until, limit=args.limit
-            )
-    finally:
-        await engine.dispose()
-
-
-async def _project_ballots(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_ballots(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
-
-
-async def _collect_law_texts(args) -> SyncReport:
-    settings = get_settings()
-    engine = build_engine(settings)
-    try:
-        async with build_collect_law_texts(settings, engine, dry_run=args.dry_run) as use_case:
-            return await use_case.execute(
-                args.legislature, dossier_uid=args.dossier, texte_uid=args.uid, limit=args.limit
-            )
-    finally:
-        await engine.dispose()
-
-
-async def _project_law_texts(args) -> SyncReport:
-    engine = build_engine(get_settings())
-    try:
-        return await build_project_law_texts(engine).execute(args.legislature)
-    finally:
-        await engine.dispose()
+def _project(args, w: Worker):
+    return project(w, args.dataset, args.legislature)
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="isos-data-worker")
+    parser = argparse.ArgumentParser(prog="isos-data-worker", description=__doc__)
+    parser.add_argument("--legislature", type=int, default=None)
+    parser.add_argument("--dry-run", action="store_true", help="fetch and parse, write nothing")
+    parser.add_argument("--refresh", action="store_true", help="re-download archives to S3")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    collect = sub.add_parser("collect-deputies", help="Assemblée nationale → raw.deputy")
-    collect.add_argument("--legislature", type=int, default=None)
-    collect.add_argument(
-        "--limit", type=int, default=None, help="stop after N deputies (development)"
+    for dataset in DATASETS:
+        c = sub.add_parser(f"collect-{dataset}", help=f"Assemblée nationale → raw ({dataset})")
+        c.add_argument("--limit", type=int, default=None, help="stop after N items")
+        c.add_argument("--uid", default=None, help="one item only")
+        c.add_argument("--dossier", default=None, help="one dossier only (DLR…)")
+        c.add_argument("--date", type=date.fromisoformat, default=None, help="one day")
+        c.add_argument("--since", type=date.fromisoformat, default=None)
+        c.add_argument("--until", type=date.fromisoformat, default=None)
+        c.set_defaults(dataset=dataset, handler=_collect)
+
+        p = sub.add_parser(f"project-{dataset}", help=f"raw → public ({dataset}), no network")
+        p.set_defaults(dataset=dataset, handler=_project)
+
+    s = sub.add_parser("sync-all", help="collect then project every dataset, in order")
+    s.add_argument(
+        "--debates",
+        type=int,
+        default=None,
+        help="scope: every deputy, then only the N latest sittings and what they touch",
     )
-    collect.add_argument("--uid", default=None, help="replay a single deputy")
-    collect.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="fetch and parse, write nothing",
+    s.set_defaults(
+        handler=lambda args, w: w.sync_all.execute(args.legislature, debates=args.debates)
     )
-    collect.set_defaults(handler=_collect_deputies)
 
-    project = sub.add_parser("project-deputies", help="raw.deputy → public.deputy (no network)")
-    project.add_argument("--legislature", type=int, default=None)
-    project.set_defaults(handler=_project_deputies)
-
-    collect_d = sub.add_parser("collect-debates", help="Assemblée nationale → raw.debate")
-    collect_d.add_argument("--legislature", type=int, default=None)
-    collect_d.add_argument("--limit", type=int, default=None, help="stop after N sittings")
-    collect_d.add_argument("--uid", default=None, help="replay a single sitting")
-    collect_d.add_argument(
-        "--date", type=date.fromisoformat, default=None, help="one day (YYYY-MM-DD)"
+    r = sub.add_parser("refresh", help="re-download the archives into S3 (database untouched)")
+    r.add_argument("datasets", nargs="*", help="deputies laws agenda debates amendments ballots")
+    r.set_defaults(
+        handler=lambda args, w: w.refresh_archives.execute(args.legislature, args.datasets or None)
     )
-    collect_d.add_argument("--since", type=date.fromisoformat, default=None, help="from this day")
-    collect_d.add_argument("--until", type=date.fromisoformat, default=None, help="up to this day")
-    collect_d.add_argument("--dry-run", action="store_true")
-    collect_d.set_defaults(handler=_collect_debates)
-
-    project_d = sub.add_parser("project-debates", help="raw.debate → public.debate (no network)")
-    project_d.add_argument("--legislature", type=int, default=None)
-    project_d.set_defaults(handler=_project_debates)
-
-    collect_a = sub.add_parser("collect-agenda", help="Assemblée nationale → raw.agenda_item")
-    collect_a.add_argument("--legislature", type=int, default=None)
-    collect_a.add_argument("--limit", type=int, default=None)
-    collect_a.add_argument("--date", type=date.fromisoformat, default=None, help="one day")
-    collect_a.add_argument("--since", type=date.fromisoformat, default=None)
-    collect_a.add_argument("--until", type=date.fromisoformat, default=None)
-    collect_a.add_argument("--dry-run", action="store_true")
-    collect_a.set_defaults(handler=_collect_agenda)
-
-    project_a = sub.add_parser(
-        "project-agenda", help="raw.agenda_item → public.debate (no network)"
-    )
-    project_a.add_argument("--legislature", type=int, default=None)
-    project_a.set_defaults(handler=_project_agenda)
-
-    collect_l = sub.add_parser("collect-laws", help="Assemblée nationale → raw.law")
-    collect_l.add_argument("--legislature", type=int, default=None)
-    collect_l.add_argument("--limit", type=int, default=None, help="stop after N dossiers")
-    collect_l.add_argument("--uid", default=None, help="replay a single dossier (DLR…)")
-    collect_l.add_argument("--dry-run", action="store_true")
-    collect_l.set_defaults(handler=_collect_laws)
-
-    project_l = sub.add_parser(
-        "project-laws", help="raw.law → public.law, law_reading, debate_law (no network)"
-    )
-    project_l.add_argument("--legislature", type=int, default=None)
-    project_l.set_defaults(handler=_project_laws)
-
-    collect_am = sub.add_parser("collect-amendments", help="Assemblée nationale → raw.amendment")
-    collect_am.add_argument("--legislature", type=int, default=None)
-    collect_am.add_argument("--dossier", default=None, help="one dossier only (DLR…)")
-    collect_am.add_argument(
-        "--since", type=date.fromisoformat, default=None, help="deposited on or after"
-    )
-    collect_am.add_argument("--limit", type=int, default=None)
-    collect_am.add_argument("--dry-run", action="store_true")
-    collect_am.set_defaults(handler=_collect_amendments)
-
-    project_am = sub.add_parser(
-        "project-amendments", help="raw.amendment → public.amendment (no network)"
-    )
-    project_am.add_argument("--legislature", type=int, default=None)
-    project_am.set_defaults(handler=_project_amendments)
-
-    collect_b = sub.add_parser("collect-ballots", help="Assemblée nationale → raw.ballot")
-    collect_b.add_argument("--legislature", type=int, default=None)
-    collect_b.add_argument("--uid", default=None, help="replay a single scrutin (VTAN…)")
-    collect_b.add_argument("--date", type=date.fromisoformat, default=None, help="one day")
-    collect_b.add_argument("--since", type=date.fromisoformat, default=None)
-    collect_b.add_argument("--until", type=date.fromisoformat, default=None)
-    collect_b.add_argument("--limit", type=int, default=None)
-    collect_b.add_argument("--dry-run", action="store_true")
-    collect_b.set_defaults(handler=_collect_ballots)
-
-    project_b = sub.add_parser(
-        "project-ballots", help="raw.ballot → public.ballot, deputy_vote (no network)"
-    )
-    project_b.add_argument("--legislature", type=int, default=None)
-    project_b.set_defaults(handler=_project_ballots)
-
-    collect_t = sub.add_parser(
-        "collect-law-texts", help="assemblee-nationale.fr → raw.law_text (articles), incremental"
-    )
-    collect_t.add_argument("--legislature", type=int, default=None)
-    collect_t.add_argument("--dossier", default=None, help="one dossier only (DLR…)")
-    collect_t.add_argument("--uid", default=None, help="one text (PRJLANR5L17B2681)")
-    collect_t.add_argument("--limit", type=int, default=None, help="stop after N texts")
-    collect_t.add_argument("--dry-run", action="store_true")
-    collect_t.set_defaults(handler=_collect_law_texts)
-
-    project_t = sub.add_parser(
-        "project-law-texts", help="raw.law_text → public.law_text, law_article (no network)"
-    )
-    project_t.add_argument("--legislature", type=int, default=None)
-    project_t.set_defaults(handler=_project_law_texts)
-
     return parser
 
 
@@ -295,17 +92,19 @@ def main() -> int:
     args = _parser().parse_args()
     settings = get_settings()
     setup_logging(settings.log_level)
-
-    if getattr(args, "legislature", None) is None:
+    if args.legislature is None:
         args.legislature = settings.an_legislature
     if getattr(args, "date", None):
         args.since = args.until = args.date
-
     logger.info("target database={}", settings.safe_database_target)
 
-    report = asyncio.run(args.handler(args))
-    print(report.as_dict())
-    return 0 if report.ok else 1
+    result = asyncio.run(_run(args, lambda w: args.handler(args, w)))
+    if hasattr(result, "as_dict"):  # one SyncReport
+        print(json.dumps(result.as_dict(), default=str))
+        return 0 if result.ok else 1
+    print(json.dumps(result, default=str, indent=1))  # sync-all / refresh
+    reports = [r for r in result.values() if isinstance(r, dict) and "ok" in r]
+    return 0 if all(r["ok"] or r["processed"] == 0 for r in reports) else 1
 
 
 if __name__ == "__main__":
