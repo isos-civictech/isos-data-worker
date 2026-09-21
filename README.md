@@ -23,9 +23,12 @@ docker network create isos-network                       # once
 (cd ../isos-api && docker compose up -d db)              # then its `alembic upgrade head`
 
 # 2. Configuration
-cp .env.example .env        # DATABASE_URL password = ISOS_INGESTION_DB_PASSWORD from isos-api's .env
+cp .env.example .env
+#    DATABASE_URL: the password is ISOS_INGESTION_DB_PASSWORD in isos-api's .env
+#    S3: generate a key pair and paste the two lines into S3_ACCESS_KEY / S3_SECRET_KEY
+python -c "import secrets; print('GK'+secrets.token_hex(12)); print(secrets.token_hex(32))"
 
-# 3. S3 (Garage) — bootstraps the bucket and prints an access key if .env has none
+# 3. S3 (Garage) — starts it and imports your key: bucket created, rights set
 make up
 
 # 4. Install, migrate, check
@@ -38,11 +41,13 @@ make check
 
 ```bash
 make sync DEBATES=5        # every deputy, then the 5 latest sittings and what they touch
-make sync                  # the whole legislature (~20 min the first time)
+make sync                  # the whole legislature: ~20 min the first time (450 MB of
+                           # archives), minutes afterwards since they are read from S3
 make collect DS=laws       # one dataset, Assemblée → raw   (S3 copy used when present)
 make project DS=laws       # one dataset, raw → public      (no network)
 make refresh               # re-download the archives into S3
-make api                   # HTTP API on :8001 — /docs for OpenAPI, / for the guide
+make api                   # optional: the HTTP server on :8001, for the front and jobs
+                           # (/ explains the routes, /docs is the OpenAPI)
 make                       # list everything
 ```
 
