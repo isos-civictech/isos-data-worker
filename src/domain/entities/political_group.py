@@ -1,10 +1,8 @@
 """
 PoliticalGroupRef — a parliamentary group (groupe politique).
 
-Source: AMO10 ZIP, `organe/PO{id}.xml` members with codeType == "GP".
-    ZIP: https://data.assemblee-nationale.fr/static/openData/repository/
-        {legislature}/amo/deputes_actifs_mandats_actifs_organes/
-        AMO10_deputes_actifs_mandats_actifs_organes.xml.zip
+Source: AMO30 ZIP, `organe/PO{id}.xml` members with codeType == "GP" (all legislatures: filter).
+    ZIP: see deputy.py
 
 XML field mapping (inside organe/PO{id}.xml):
     uid         → organe/uid                ("PO845401")

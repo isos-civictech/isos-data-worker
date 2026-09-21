@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Trimmed from a real AMO10 file. The default namespace is kept ON PURPOSE:
+<!-- Trimmed from a real AMO file (same format in AMO10 and AMO30). The default namespace is kept ON PURPOSE:
      it is trap #1, and without it every findtext() returns None silently. -->
 <acteur xmlns="http://schemas.assemblee-nationale.fr/referentiel">
     <uid xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="IdActeur">PA1592</uid>

@@ -7,13 +7,12 @@ ON CONFLICT. Slugs are written once and never updated: a title fix upstream
 must not break an already-indexed URL.
 """
 
-from datetime import date
-
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from src.domain.ports.projections.deputy_projection import DeputyProjection
+from src.domain.shared.legislatures import legislature_start
 from src.domain.shared.results import SyncReport
 from src.infrastructure.persistence.engine import transaction
 from src.infrastructure.persistence.raw import tables as raw
@@ -25,21 +24,6 @@ from src.infrastructure.persistence.serving.mappers.deputy_mapper import (
 )
 from src.infrastructure.persistence.serving.slug import unique_slug
 
-# Opening day of each legislature. Only the 17th is collected, but dossiers
-# deposited under an earlier one can still be alive and get projected.
-LEGISLATURE_START = {
-    17: date(2024, 7, 18),
-    16: date(2022, 6, 22),
-    15: date(2017, 6, 21),
-    14: date(2012, 6, 20),
-    13: date(2007, 6, 20),
-    12: date(2002, 6, 19),
-    11: date(1997, 6, 12),
-    10: date(1993, 4, 2),
-    9: date(1988, 6, 23),
-    8: date(1986, 4, 2),
-}
-
 
 async def ensure_legislature(connection: AsyncConnection, number: int) -> int:
     """
@@ -48,7 +32,7 @@ async def ensure_legislature(connection: AsyncConnection, number: int) -> int:
     """
     statement = (
         insert(pub.legislature)
-        .values(number=number, started_at=LEGISLATURE_START.get(number, date(2024, 7, 18)))
+        .values(number=number, started_at=legislature_start(number))
         .on_conflict_do_update(index_elements=["number"], set_={"number": number})
         .returning(pub.legislature.c.id)
     )
@@ -93,12 +77,16 @@ class SqlDeputyProjection(DeputyProjection):
 
         raw_deputies = await self._load_raw_deputies(legislature)
 
-        for deputy, mandate in raw_deputies:
+        for deputy, mandates in raw_deputies:
             report.processed += 1
+            if not mandates:
+                # A minister who never sat: kept in raw, not a deputy for the front.
+                report.skipped += 1
+                continue
             try:
                 async with transaction(self._engine) as connection:
                     created = await self._project_one(
-                        connection, deputy, mandate, legislature_id, group_ids
+                        connection, deputy, mandates, legislature_id, group_ids
                     )
                 report.created += int(created)
                 report.updated += int(not created)
@@ -122,36 +110,53 @@ class SqlDeputyProjection(DeputyProjection):
             ids[group["uid"]] = group_id
         return ids
 
-    async def _load_raw_deputies(self, legislature: int) -> list[tuple]:
-        """Each deputy with its (single, current) mandate — None if absent."""
-        query = (
-            sa.select(raw.deputy, raw.mandate)
-            .select_from(
-                raw.deputy.outerjoin(raw.mandate, raw.mandate.c.deputy_uid == raw.deputy.c.uid)
-            )
-            .where(raw.deputy.c.legislature == legislature)
-            .order_by(raw.deputy.c.uid)
-        )
+    async def _load_raw_deputies(self, legislature: int) -> list[tuple[dict, list[dict]]]:
+        """Each deputy with its seats, oldest first (a deputy can have several)."""
         async with self._engine.connect() as connection:
-            result = await connection.execute(query)
-            pairs = []
-            for row in result.mappings():
-                deputy = {c.name: row[c] for c in raw.deputy.c}
-                mandate = {c.name: row[c] for c in raw.mandate.c} if row[raw.mandate.c.id] else None
-                pairs.append((deputy, mandate))
-        return pairs
+            deputies = (
+                (
+                    await connection.execute(
+                        sa.select(raw.deputy)
+                        .where(raw.deputy.c.legislature == legislature)
+                        .order_by(raw.deputy.c.uid)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            mandates = (
+                (
+                    await connection.execute(
+                        sa.select(raw.mandate)
+                        .where(raw.mandate.c.legislature == legislature)
+                        # Same start date twice (AN quirk): the longer seat comes last and wins.
+                        .order_by(
+                            raw.mandate.c.mandate_start, raw.mandate.c.mandate_end.nulls_last()
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        by_deputy: dict[str, list[dict]] = {}
+        for m in mandates:
+            by_deputy.setdefault(m["deputy_uid"], []).append(dict(m))
+        return [(dict(d), by_deputy.get(d["uid"], [])) for d in deputies]
 
     async def _project_one(
-        self, connection: AsyncConnection, deputy, mandate, legislature_id: int, group_ids: dict
+        self, connection: AsyncConnection, deputy, mandates, legislature_id: int, group_ids: dict
     ) -> bool:
-        row = deputy_row(deputy, mandate)
+        # The latest seat gives the constituency shown on the card.
+        row = deputy_row(deputy, mandates[-1])
         row["slug"] = await unique_slug(connection, pub.deputy, row["slug"], row["external_id"])
         deputy_id, created = await _upsert_by_external_id(
             connection, pub.deputy, row, write_once=("slug",)
         )
 
         # Mandate needs a group and a start date: both NOT NULL in public.
-        if mandate and mandate["group_uid"] in group_ids and mandate["mandate_start"]:
+        for mandate in mandates:
+            if mandate["group_uid"] not in group_ids or not mandate["mandate_start"]:
+                continue
             row = mandate_row(
                 mandate,
                 deputy_id=deputy_id,
