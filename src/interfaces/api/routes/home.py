@@ -77,6 +77,11 @@ _PAGE = """<!doctype html>
         liés à la séance, à la loi, à la lecture et à l'amendement voté.
         À lancer <b>en dernier</b></td></tr>
     <tr><td>GET /deputies/{uid}/votes</td><td>les derniers votes d'un député</td></tr>
+    <tr><td>POST /sync/law-texts</td><td>le texte des lois, article par article, dans chaque
+        version (déposé, commission, adopté) — scrapé sur assemblee-nationale.fr, incrémental.
+        À lancer après les lois et les amendements</td></tr>
+    <tr><td>GET /laws/{uid}/articles/{article_ref}</td><td>un article au fil des versions,
+        avec les amendements qui l'ont visé — ex. <code>Article 2</code></td></tr>
   </table>
 
   <h2>En ligne de commande</h2>

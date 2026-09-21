@@ -13,12 +13,14 @@ from src.application.use_cases.collect_amendments import CollectAmendments
 from src.application.use_cases.collect_ballots import CollectBallots
 from src.application.use_cases.collect_debates import CollectDebates
 from src.application.use_cases.collect_deputies import CollectDeputies
+from src.application.use_cases.collect_law_texts import CollectLawTexts
 from src.application.use_cases.collect_laws import CollectLaws
 from src.application.use_cases.project_agenda import ProjectAgenda
 from src.application.use_cases.project_amendments import ProjectAmendments
 from src.application.use_cases.project_ballots import ProjectBallots
 from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
+from src.application.use_cases.project_law_texts import ProjectLawTexts
 from src.application.use_cases.project_laws import ProjectLaws
 from src.config import Settings
 from src.domain.ports.storage import RawStoragePort
@@ -28,6 +30,7 @@ from src.infrastructure.adapters.an_ballot_adapter import AnBallotAdapter
 from src.infrastructure.adapters.an_debate_adapter import AnDebateAdapter
 from src.infrastructure.adapters.an_deputy_adapter import AnDeputyAdapter
 from src.infrastructure.adapters.an_law_adapter import AnLawAdapter
+from src.infrastructure.adapters.an_law_text_adapter import AnLawTextAdapter
 from src.infrastructure.http.client import HttpClient
 from src.infrastructure.persistence.engine import create_engine
 from src.infrastructure.persistence.raw.agenda_repository import SqlRawAgendaRepository
@@ -39,12 +42,14 @@ from src.infrastructure.persistence.raw.ingestion_log_repository import (
     SqlIngestionLogRepository,
 )
 from src.infrastructure.persistence.raw.law_repository import SqlRawLawRepository
+from src.infrastructure.persistence.raw.law_text_repository import SqlRawLawTextRepository
 from src.infrastructure.persistence.serving.agenda_projection import SqlAgendaProjection
 from src.infrastructure.persistence.serving.amendment_projection import SqlAmendmentProjection
 from src.infrastructure.persistence.serving.ballot_projection import SqlBallotProjection
 from src.infrastructure.persistence.serving.debate_projection import SqlDebateProjection
 from src.infrastructure.persistence.serving.deputy_projection import SqlDeputyProjection
 from src.infrastructure.persistence.serving.law_projection import SqlLawProjection
+from src.infrastructure.persistence.serving.law_text_projection import SqlLawTextProjection
 from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
 
 
@@ -211,3 +216,26 @@ async def build_collect_ballots(
 
 def build_project_ballots(engine: AsyncEngine) -> ProjectBallots:
     return ProjectBallots(projection=SqlBallotProjection(engine))
+
+
+@asynccontextmanager
+async def build_collect_law_texts(
+    settings: Settings,
+    engine: AsyncEngine,
+    *,
+    dry_run: bool = False,
+) -> AsyncIterator[CollectLawTexts]:
+    storage = build_storage(settings)
+    async with HttpClient(
+        timeout_s=settings.http_timeout_s, max_attempts=settings.http_max_attempts
+    ) as http:
+        yield CollectLawTexts(
+            source=AnLawTextAdapter(http, storage),
+            repository=SqlRawLawTextRepository(engine),
+            log_repository=SqlIngestionLogRepository(engine),
+            dry_run=dry_run,
+        )
+
+
+def build_project_law_texts(engine: AsyncEngine) -> ProjectLawTexts:
+    return ProjectLawTexts(projection=SqlLawTextProjection(engine))

@@ -35,6 +35,7 @@ def law_stage_row(stage: LegislativeStage, *, dossier_uid: str) -> dict[str, Any
         "decision_code": stage.decision_code,
         "texte_uid": stage.texte_uid,
         "commission_texte_uid": stage.commission_texte_uid,
+        "adopted_texte_uid": stage.adopted_texte_uid,
         "sitting_refs": stage.sitting_refs,
     }
 
