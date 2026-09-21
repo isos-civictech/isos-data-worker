@@ -68,7 +68,6 @@ debate = sa.Table(
     # Postgres enum: declared as such, or asyncpg sends text and Postgres refuses.
     sa.Column("calendar_status", pg.ENUM(name="event_status", create_type=False), nullable=False),
     sa.Column("slug", sa.String(255), nullable=False),
-    sa.Column("raw_s3_key", sa.Text),
     sa.Column("source_url", sa.Text),
     sa.Column("external_id", sa.String(100)),
     sa.Column("updated_at", sa.DateTime(timezone=True)),
@@ -80,6 +79,7 @@ law = sa.Table(
     sa.Column("id", sa.Integer, primary_key=True),
     sa.Column("legislature_id", sa.Integer, nullable=False),
     sa.Column("type", pg.ENUM(name="law_type", create_type=False), nullable=False),
+    sa.Column("texte_number", sa.Integer),  # the "n° 2681" of the deposited text
     sa.Column("name", sa.String(255), nullable=False),  # short, truncated
     sa.Column("title", sa.Text),  # full dossier title
     sa.Column("slug", sa.Text, nullable=False),
@@ -109,4 +109,24 @@ debate_law = sa.Table(
     sa.Column("debate_id", sa.Integer, primary_key=True),
     sa.Column("law_id", sa.Integer, primary_key=True),
     sa.Column("law_reading_id", sa.Integer),
+)
+
+amendment = sa.Table(
+    "amendment",
+    metadata,
+    sa.Column("id", sa.Integer, primary_key=True),
+    sa.Column("law_id", sa.Integer, nullable=False),
+    sa.Column("law_reading_id", sa.Integer),
+    sa.Column("number", sa.String(20)),
+    sa.Column("examined_in", sa.String(50)),
+    sa.Column("article_ref", sa.String(255)),
+    sa.Column(
+        "author_type", pg.ENUM(name="amendment_author_type", create_type=False), nullable=False
+    ),
+    sa.Column("deputy_id", sa.Integer),
+    sa.Column("political_group_id", sa.Integer),
+    sa.Column("status", pg.ENUM(name="amendment_status", create_type=False), nullable=False),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("external_id", sa.String(100)),
+    sa.Column("updated_at", sa.DateTime(timezone=True)),
 )

@@ -112,3 +112,17 @@ def test_law_from_raw_rebuilds_the_entity():
     assert law.stages[0].uid == "DLR5L17N1-AN1"
     assert law.stages[0].order == 1
     assert law.texte_uid == "PRJL1"
+
+
+def test_number_prefers_the_assemblee_text():
+    from src.domain.entities.law_texte import LawTexte
+
+    senat = LawTexte(uid="PRJLSNR5S479B0456", dossier_uid="D", legislature=17, kind="PRJL",
+                     number=456, deposited_at=date(2026, 3, 18))  # fmt: skip
+    an = LawTexte(uid="PRJLANR5L17B2681", dossier_uid="D", legislature=17, kind="PRJL",
+                  number=2681, deposited_at=date(2026, 4, 15))  # fmt: skip
+    commission = LawTexte(uid="PRJLANR5L17BTC3046", dossier_uid="D", legislature=17,
+                          kind="PRJL", number=3046)  # fmt: skip
+    assert _law(textes=[senat, an, commission]).number == 2681
+    assert _law(textes=[senat]).number == 456
+    assert _law().number is None

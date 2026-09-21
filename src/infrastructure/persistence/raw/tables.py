@@ -172,10 +172,37 @@ law_stage = sa.Table(
     sa.Column("decision", sa.Text),  # "adopté", "rejeté", "modifié"
     sa.Column("decision_code", sa.String(20)),  # "TSORTF01", "TSORTF07"…
     sa.Column("texte_uid", sa.String(100)),  # text deposited for this reading
+    sa.Column("commission_texte_uid", sa.String(100)),  # text adopted by the commission
     # Agenda uids of the public sittings (RUAN… / RUSN…): the law -> debate join.
     sa.Column("sitting_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_law_stage_dossier", "dossier_uid"),
 )
+
+# One row per document of a dossier: deposited text, commission text, report.
+law_texte = sa.Table(
+    "law_texte",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "PRJLANR5L17B2681"
+    sa.Column(
+        "dossier_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.law.dossier_uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("kind", sa.String(20)),  # PRJL | PION | PNRE | RAPP | RINF…
+    sa.Column("sub_kind", sa.String(50)),
+    sa.Column("number", sa.Integer),  # the "n° 2681"
+    sa.Column("title", sa.Text),
+    sa.Column("short_title", sa.Text),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("author_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("organe_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_law_texte_dossier", "dossier_uid"),
+    sa.Index("ix_raw_law_texte_number", "legislature", "number"),
+)
+
 
 # ── Sittings ──────────────────────────────────────────────────────────────────
 
@@ -274,4 +301,44 @@ agenda_point = sa.Table(
     # Law dossier uids ("DLR5L17N53818"): the clean debate -> law join.
     sa.Column("dossier_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_agenda_point_agenda", "agenda_uid"),
+)
+
+
+# ── Amendments ────────────────────────────────────────────────────────────────
+
+# One row per amendment, séance and commission alike. Bodies are the AN's HTML.
+amendment = sa.Table(
+    "amendment",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("dossier_uid", sa.String(100)),  # -> raw.law.dossier_uid
+    sa.Column("texte_uid", sa.String(100), nullable=False),  # -> raw.law_stage.texte_uid
+    sa.Column("examen_ref", sa.String(100)),
+    sa.Column("number", sa.String(20)),  # "225", "II-CF146"
+    sa.Column("rectification", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("examined_by", sa.String(50)),  # "AN" = séance publique, else a commission
+    sa.Column("parent_uid", sa.String(100)),  # sous-amendement
+    sa.Column("author_type", sa.String(50), nullable=False),  # Député | Rapporteur | Gouvernement
+    sa.Column("deputy_uid", sa.String(100)),
+    sa.Column("group_uid", sa.String(100)),
+    sa.Column("cosigner_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("signatories", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("division_title", sa.Text),  # "Article 2"
+    sa.Column("division_type", sa.String(50)),
+    sa.Column("division_position", sa.String(20)),  # Avant | A | Après
+    sa.Column("alinea", sa.Text),  # "Après l'alinéa 34"
+    sa.Column("content", sa.Text),  # plain text, paragraphs separated by a blank line
+    sa.Column("summary", sa.Text),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("published_at", sa.Date),
+    sa.Column("state", sa.String(100)),
+    sa.Column("sub_state", sa.String(100)),
+    sa.Column("sort", sa.String(50)),
+    sa.Column("sorted_at", sa.DateTime(timezone=True)),
+    *_seen_columns(),
+    sa.Index("ix_raw_amendment_dossier", "dossier_uid"),
+    sa.Index("ix_raw_amendment_texte", "texte_uid"),
+    sa.Index("ix_raw_amendment_deputy", "deputy_uid"),
 )

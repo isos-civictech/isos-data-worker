@@ -16,6 +16,7 @@ JSON field mapping (root key: dossierParlementaire):
     procedure_label  → procedureParlementaire/libelle
     initiator_uids   → initiateur/acteurs/acteur[]/acteurRef   (dict when single, list otherwise)
     stages           → actesLegislatifs/acteLegislatif[] at depth 1 (see legislative_stage.py)
+    textes           → json/document/*.json whose dossierRef is this dossier (see law_texte.py)
 
 Not every dossier is a law: résolutions (8, 22), rapports (19), missions
 (9, 10) share the same file. `is_law` tells them apart.
@@ -26,6 +27,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
+from src.domain.entities.law_texte import LawTexte
 from src.domain.entities.legislative_stage import PROMULGATION_CODE, LegislativeStage
 from src.domain.shared.validators import Legislature, NotBlankStr
 
@@ -41,10 +43,13 @@ PROCEDURE_TYPES: dict[str, LawType | None] = {
     "1": LawType.BILL,  # Projet de loi ordinaire
     "2": LawType.PROPOSITION,  # Proposition de loi ordinaire
     "3": LawType.BILL,  # Projet de loi de finances
+    "4": LawType.BILL,  # Projet de loi de financement de la sécurité sociale
     "5": None,  # organique
     "6": LawType.BILL,  # Ratification de traités
     "7": None,  # constitutionnelle
     "21": LawType.BILL,  # Loi de finances rectificative
+    "23": LawType.PROPOSITION,  # Proposition de loi, article 11 (référendum d'initiative partagée)
+    "33": LawType.BILL,  # Loi de règlement (résultats de la gestion)
 }
 
 
@@ -69,6 +74,7 @@ class Law(BaseModel):
     initiator_uids: list[str] = []
     withdrawn: bool = False  # an AN1-RTRINI / ANLUNI-RTRINI act exists
     stages: list[LegislativeStage] = []
+    textes: list[LawTexte] = []
     s3_key: str | None = None
 
     @computed_field
@@ -91,6 +97,17 @@ class Law(BaseModel):
     def texte_uid(self) -> str | None:
         """Uid of the first deposited text."""
         return next((s.texte_uid for s in self.stages if s.texte_uid), None)
+
+    @computed_field
+    @property
+    def number(self) -> int | None:
+        """The 'n° 2681' of the dossier: its first text deposited at the Assemblée."""
+        deposited = [
+            t for t in self.textes if t.is_law_text and t.number and not t.is_commission_text
+        ]
+        # Sénat numbers only when the text never reached the Assemblée.
+        deposited.sort(key=lambda t: (not t.is_assemblee, t.deposited_at or date.max, t.number))
+        return deposited[0].number if deposited else None
 
     @computed_field
     @property

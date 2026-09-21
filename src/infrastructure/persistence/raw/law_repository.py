@@ -9,7 +9,11 @@ from src.infrastructure.persistence.engine import transaction
 from src.infrastructure.persistence.raw import tables
 from src.infrastructure.persistence.raw.debate_repository import _bulk_upsert
 from src.infrastructure.persistence.raw.deputy_repository import _upsert
-from src.infrastructure.persistence.raw.mappers.law_mapper import law_row, law_stage_row
+from src.infrastructure.persistence.raw.mappers.law_mapper import (
+    law_row,
+    law_stage_row,
+    law_texte_row,
+)
 
 
 class SqlRawLawRepository(LawRepository):
@@ -25,4 +29,7 @@ class SqlRawLawRepository(LawRepository):
             stages = [law_stage_row(s, dossier_uid=law.dossier_uid) for s in law.stages]
             if stages:
                 await connection.execute(_bulk_upsert(tables.law_stage, stages, key="stage_uid"))
+            textes = [law_texte_row(t) for t in law.textes]
+            if textes:
+                await connection.execute(_bulk_upsert(tables.law_texte, textes, key="uid"))
         return SaveOutcome(entity_id=law_id, created=created)

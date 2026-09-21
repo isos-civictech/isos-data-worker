@@ -55,3 +55,20 @@ def test_report_is_kept_but_not_a_law():
     assert report.procedure_code == "19"
     assert not report.is_law
     assert report.law_type is None
+
+
+def test_commission_text_on_the_reading(law):
+    an1 = law.stages[1]
+    assert an1.commission_texte_uid is None, "the AN commission adopted no text here"
+    assert law.stages[0].commission_texte_uid == "PRJLSNR5S479BTC0521"
+
+
+def test_document_gives_the_texte_number():
+    texte = AnLawAdapter._parse_document((FIXTURES / "document_PRJLANR5L17B2681.json").read_bytes())
+    assert texte.uid == "PRJLANR5L17B2681"
+    assert texte.dossier_uid == "DLR5L17N53940"
+    assert texte.number == 2681
+    assert texte.kind == "PRJL" and texte.is_law_text
+    assert texte.is_assemblee and not texte.is_commission_text
+    assert texte.deposited_at == date(2026, 4, 15)
+    assert texte.organe_uids == ["PO838901"]
