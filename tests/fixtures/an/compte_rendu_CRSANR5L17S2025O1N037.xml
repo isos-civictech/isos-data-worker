@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Trimmed from the real Syceron file: 2 points kept, sommaire dropped. -->
+<compteRendu xmlns="http://schemas.assemblee-nationale.fr/referentiel">
+  <uid>CRSANR5L17S2025O1N037</uid>
+  <seanceRef>RUANR5L17S2025IDS28624</seanceRef>
+  <sessionRef>SCR5A2025O1</sessionRef>
+  <metadonnees>
+    <dateSeance>20241106140000000</dateSeance>
+    <dateSeanceJour>mercredi 06 novembre 2024</dateSeanceJour>
+    <numSeanceJour>1</numSeanceJour>
+    <numSeance>37</numSeance>
+    <typeAssemblee>AN</typeAssemblee>
+    <legislature>17</legislature>
+    <session>Session ordinaire 2024-2025</session>
+    <nomFichierJo>20240037</nomFichierJo>
+    <validite>valide</validite>
+    <etat>complet</etat>
+    <diffusion>public</diffusion>
+    <version>avant_JO</version>
+    <environnement>PROD</environnement>
+    <heureGeneration>2024-11-14T13:15:20.000+01:00</heureGeneration>
+    </metadonnees>
+  <contenu>
+    <quantiemes>
+      <journee>Première séance du mercredi 06 novembre 2024</journee>
+      <session>Session ordinaire 2024-2025</session>
+    </quantiemes>
+    <point nivpoint="2" valeur_ptsodj="1" ordinal_prise="1" id_preparation="2566809" ordre_absolu_seance="7" code_grammaire="QG_1_1" code_style="Sous-tit_p_cap" code_parole="" sommaire="1" id_syceron="3555181" valeur="">
+      <orateurs/>
+      <texte>Indemnisation des incorporés de force en Alsace</texte>
+      <paragraphe valeur_ptsodj="1" ordinal_prise="1" id_preparation="2566810" ordre_absolu_seance="8" id_acteur="PA721908" id_mandat="PM843467" id_nomination_oe="0" id_nomination_op="PM845400" code_grammaire="PAROLE_GENERIQUE" code_style="NORMAL" code_parole="" sommaire="0" id_syceron="3555182" valeur="">
+        <orateurs>
+          <orateur>
+            <nom>Mme la présidente</nom>
+            <id>721908</id>
+            <qualite/>
+          </orateur>
+        </orateurs>
+        <texte stime="35.71">La parole est à Mme Louise Morel.</texte>
+      </paragraphe>
+      <paragraphe valeur_ptsodj="1" ordinal_prise="1" id_preparation="2566811" ordre_absolu_seance="9" id_acteur="PA794810" id_mandat="PM843194" id_nomination_oe="-1" id_nomination_op="-1" code_grammaire="PAROLE_GENERIQUE" code_style="NORMAL" code_parole="" sommaire="1" id_syceron="3555183" valeur="">
+        <orateurs>
+          <orateur>
+            <nom>Mme Louise Morel</nom>
+            <id>794810</id>
+            <qualite/>
+          </orateur>
+        </orateurs>
+        <texte stime="45.00">Monsieur le ministre délégué auprès du ministre des armées et des anciens combattants, ce n’est pas sans émotion que je prends la parole, tant le sujet que je souhaite évoquer parle au cœur de chaque famille d’Alsace et de Moselle. Depuis des décennies, les interpellations se succèdent sur la considération que la France a témoignée aux incorporés de force des départements du Bas-Rhin, du Haut-Rhin et de la Moselle, mais les réponses n’ont pas apporté l’apaisement.<br/>Pour celles et ceux qui l’ignorent encore, les incorporés de force, ce sont 130 000 hommes qui ont été contraints de revêtir l’uniforme allemand pendant la seconde guerre mondiale et de se battre contre leur patrie. Trente mille d’entre eux sont morts, 30 000 sont revenus blessés de guerre ou invalides et 10 000 ont été portés disparus.<br/>Le sort que notre république leur a réservé après la guerre n’est pas digne. Nous avons voulu oublier qu’ils ont été des victimes de l’histoire nationale, oublier qu’ils n’avaient pas le choix ; oublier leur héroïsme – ils ont été nombreux à recevoir la médaille de la Résistance intérieure ; oublier les drames que cela a entraînés dans chaque famille, et je pense avec émotion à leurs veuves et à leurs orphelins.<br/>Dans quelques jours, nous commémorerons le 11 Novembre et célébrerons le 80<exposant>e</exposant> anniversaire de la libération de l’Alsace.<br/>Aurons-nous enfin le courage de reconnaître que l’incorporation de force est un crime ? Elle l’est, car l’Alsace et la Moselle ont été annexées de fait, non de droit.<br/>Le Gouvernement acceptera-t-il enfin d’enseigner cette histoire de manière permanente dans les manuels scolaires de notre pays ?</texte>
+      </paragraphe>
+      <paragraphe valeur_ptsodj="1" ordinal_prise="1" id_preparation="2566819" ordre_absolu_seance="15" id_acteur="PA718850" id_mandat="PM842411" id_nomination_oe="-1" id_nomination_op="-1" code_grammaire="INTERRUPTION_1_10" code_style="NORMAL" code_parole="" sommaire="0" id_syceron="3555240" valeur="">
+        <orateurs>
+          <orateur>
+            <nom>M. Pierre Cordier</nom>
+            <id>718850</id>
+            <qualite/>
+          </orateur>
+        </orateurs>
+        <texte stime="82.42">Surtout que la seconde guerre mondiale est déjà presque effacée dans les mémoires !</texte>
+      </paragraphe>
+      </point>
+    <point nivpoint="2" valeur_ptsodj="1" ordinal_prise="4" id_preparation="2566867" ordre_absolu_seance="176" code_grammaire="QG_1_1" code_style="Sous-tit_p_cap" code_parole="" sommaire="1" id_syceron="3555308" valeur="">
+      <orateurs/>
+      <texte>Lutte contre le narcotrafic</texte>
+      <paragraphe valeur_ptsodj="1" ordinal_prise="4" id_preparation="2566868" ordre_absolu_seance="177" id_acteur="PA721908" id_mandat="PM843467" id_nomination_oe="0" id_nomination_op="PM845400" code_grammaire="PAROLE_GENERIQUE" code_style="NORMAL" code_parole="" sommaire="0" id_syceron="3555309" valeur="">
+        <orateurs>
+          <orateur>
+            <nom>Mme la présidente</nom>
+            <id>721908</id>
+            <qualite/>
+          </orateur>
+        </orateurs>
+        <texte stime="2626.42">La parole est à Mme Christine Arrighi.</texte>
+      </paragraphe>
+      <point nivpoint="99" valeur_ptsodj="1" ordinal_prise="5" id_preparation="2566881" ordre_absolu_seance="190" code_grammaire="SUSP_SEANCE_1_1" code_style="Suspension rappel" code_parole="" sommaire="1" id_syceron="3555259" valeur="">
+        <orateurs/>
+        <texte>
+          <italique>Suspension et reprise de la séance</italique>
+        </texte>
+        <paragraphe valeur_ptsodj="1" ordinal_prise="5" id_preparation="2566882" ordre_absolu_seance="191" id_acteur="PA721908" id_mandat="PM843467" id_nomination_oe="0" id_nomination_op="PM845400" code_grammaire="SUSP_SEANCE_2_1" code_style="NORMAL" code_parole="" sommaire="0" id_syceron="3555260" valeur="" roledebat="president">
+          <orateurs>
+            <orateur>
+              <nom>Mme la présidente</nom>
+              <id>721908</id>
+              <qualite/>
+            </orateur>
+          </orateurs>
+          <texte stime="2869.58">La séance est suspendue.</texte>
+        </paragraphe>
+        </point>
+    </point>
+    </contenu>
+</compteRendu>

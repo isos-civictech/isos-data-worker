@@ -5,6 +5,7 @@ Database engine and transaction boundary.
 it ONCE PER ROOT ENTITY — one deputy and its mandates, one law and its stages,
 one sitting with its points and speeches.
 """
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 

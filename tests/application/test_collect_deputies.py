@@ -1,4 +1,5 @@
 """Use case tests with plain fakes — no database, no network, no mocks."""
+
 import pytest
 
 from src.application.use_cases.collect_deputies import CollectDeputies
@@ -18,7 +19,7 @@ class FakeSource(DeputySource):
     def __init__(self, deputies, groups=None):
         self._deputies = deputies
         self._groups = groups or []
-        self.last_s3_key = "raw/deputies/17/AMO10.xml.zip"
+        self.last_s3_key = "raw/deputies/17/AMO30.xml.zip"
 
     def archive_url(self, legislature: int) -> str:
         return f"https://example.test/{legislature}"

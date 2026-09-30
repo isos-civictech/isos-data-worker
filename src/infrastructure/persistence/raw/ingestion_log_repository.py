@@ -1,4 +1,5 @@
 """raw.ingestion_run — one row per run."""
+
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncEngine
 

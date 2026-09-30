@@ -4,7 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -18,9 +17,7 @@ class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────
     # Role isos_ingestion : owner of the schema `raw`, write-only on the
     # content tables of `public`.
-    database_url: str = (
-        "postgresql+asyncpg://isos_ingestion:isos_ingestion@localhost:5432/isos_db"
-    )
+    database_url: str = "postgresql+asyncpg://isos_ingestion:isos_ingestion@localhost:5432/isos_db"
 
     # ── Stockage objet (S3) ──────────────────────────────────
     s3_endpoint: str | None = None

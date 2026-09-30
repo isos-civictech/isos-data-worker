@@ -1,4 +1,5 @@
 """Port: one row per run in raw.ingestion_run."""
+
 from abc import ABC, abstractmethod
 
 from src.domain.shared.results import SyncReport

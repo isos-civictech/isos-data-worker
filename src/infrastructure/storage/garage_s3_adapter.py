@@ -2,6 +2,7 @@
 S3-compatible storage (Garage, MinIO…). boto3 is synchronous, so every call
 goes through `asyncio.to_thread`.
 """
+
 import asyncio
 
 import boto3
@@ -46,11 +47,22 @@ class GarageS3Storage(RawStoragePort):
         logger.debug("storage.put key={} bytes={}", key, len(body))
         return key
 
+    async def get(self, key: str) -> bytes | None:
+        try:
+            response = await asyncio.to_thread(
+                self._client.get_object, Bucket=self._bucket, Key=key
+            )
+        except ClientError as exc:
+            if exc.response["Error"]["Code"] in {"404", "NoSuchKey"}:
+                return None
+            raise
+        body = await asyncio.to_thread(response["Body"].read)
+        logger.debug("storage.get key={} bytes={}", key, len(body))
+        return body
+
     async def exists(self, key: str) -> bool:
         try:
-            await asyncio.to_thread(
-                self._client.head_object, Bucket=self._bucket, Key=key
-            )
+            await asyncio.to_thread(self._client.head_object, Bucket=self._bucket, Key=key)
         except ClientError as exc:
             if exc.response["Error"]["Code"] in {"404", "NoSuchKey"}:
                 return False

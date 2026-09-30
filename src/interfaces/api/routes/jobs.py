@@ -1,4 +1,5 @@
 """Ingestion history, read from raw.ingestion_run."""
+
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -15,9 +16,7 @@ async def list_runs(
     limit: int = Query(default=20, le=100),
     engine: AsyncEngine = Depends(get_engine),
 ) -> list[dict]:
-    query = sa.select(tables.ingestion_run).order_by(
-        tables.ingestion_run.c.id.desc()
-    ).limit(limit)
+    query = sa.select(tables.ingestion_run).order_by(tables.ingestion_run.c.id.desc()).limit(limit)
     if entity_type:
         query = query.where(tables.ingestion_run.c.entity_type == entity_type)
 

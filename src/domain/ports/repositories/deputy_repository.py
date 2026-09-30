@@ -1,6 +1,7 @@
 """
 Port: write deputies into the `raw` schema.
 """
+
 from abc import ABC, abstractmethod
 
 from src.domain.entities.deputy import Deputy

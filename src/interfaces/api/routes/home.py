@@ -1,4 +1,5 @@
 """Welcome page."""
+
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
@@ -50,14 +51,39 @@ _PAGE = """<!doctype html>
 
   <h2>Déclencher</h2>
   <table>
-    <tr><td>POST /collect/deputies</td><td>tous les députés — options
-        <code>legislature</code>, <code>limit</code>, <code>dry_run</code></td></tr>
-    <tr><td>POST /collect/deputies/{uid}</td><td>un seul député, par son uid AN</td></tr>
+    <tr><td>POST /sync/all</td><td><b>tout, dans l'ordre</b> : députés, agenda, débats, lois,
+        amendements, textes, scrutins — puis projection. <code>?debates=5</code> se limite
+        aux 5 dernières séances et à ce qu'elles touchent (les députés : toujours tous)</td></tr>
+    <tr><td>POST /sync/{dataset}</td><td>un jeu, collecte puis projection —
+        <code>deputies laws agenda debates amendments ballots law-texts</code></td></tr>
+    <tr><td>POST /collect/{dataset}</td><td>Assemblée → raw seulement. Options
+        <code>limit</code>, <code>uid</code>, <code>dossier</code>, <code>since</code>,
+        <code>until</code>, <code>dry_run</code>. L'archive vient de <b>notre S3</b> quand elle y
+        est ; <code>refresh=true</code> force le téléchargement</td></tr>
+    <tr><td>POST /project/{dataset}</td><td>raw → public seulement, sans réseau —
+        à relancer après une correction de projection</td></tr>
+    <tr><td>POST /refresh</td><td>re-télécharge les archives dans S3, sans toucher la base —
+        <code>?datasets=laws&amp;datasets=agenda</code> pour choisir</td></tr>
+  </table>
+
+  <h2>Lire (brut)</h2>
+  <table>
+    <tr><td>GET /agenda/today</td><td>ce qui est à l'ordre du jour aujourd'hui</td></tr>
+    <tr><td>GET /agenda/upcoming</td><td>les prochaines séances</td></tr>
+    <tr><td>GET /laws/{uid}</td><td>un dossier (DLR…) et ses étapes</td></tr>
+    <tr><td>GET /laws/{uid}/amendments</td><td>les amendements d'un dossier</td></tr>
+    <tr><td>GET /laws/{uid}/articles/{article_ref}</td><td>un article au fil des versions,
+        avec les amendements qui l'ont visé — ex. <code>Article 2</code></td></tr>
+    <tr><td>GET /deputies/{uid}/votes</td><td>les derniers votes d'un député</td></tr>
+    <tr><td>GET /jobs</td><td>les dernières exécutions</td></tr>
   </table>
 
   <h2>En ligne de commande</h2>
-  <div class="flow">python -m src.interfaces.cli collect-deputies --limit 5 --dry-run
-python -m src.interfaces.cli collect-deputies --legislature 17</div>
+  <div class="flow">make sync DEBATES=5        # les 5 dernières séances et ce qu'elles touchent
+make sync                  # toute la législature
+make collect DS=laws       # un jeu, Assemblée → raw
+make project DS=laws       # un jeu, raw → public
+make refresh               # les archives, vers S3</div>
 
   <h2>Documentation</h2>
   <p><a href="/docs">/docs</a> — référence OpenAPI interactive.</p>

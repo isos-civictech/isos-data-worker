@@ -1,6 +1,7 @@
 """
 ZIP reading — the Assemblée nationale publishes everything as archives.
 """
+
 import io
 import zipfile
 from collections.abc import Iterator

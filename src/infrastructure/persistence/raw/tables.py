@@ -4,13 +4,14 @@ for the worker's Alembic.
 
 Conventions: BIGSERIAL id + AN uid as UNIQUE natural key; nothing is ever
 deleted. On every root table:
-    first_seen_at   first insert
-    last_seen_at    last run in which the AN export still contained it — a row
-                    that stops advancing means the entity left the export
-    updated_at      last time the content actually changed
-    last_run_id     the ingestion_run that last touched it
+    created_at         first insert
+    updated_at         last time the content actually changed
+    ingestion_run_id   the run that last touched the row — join ingestion_run
+                       for its date and its raw file (s3_key)
+    s3_key             the archive this row was parsed from
 Column names follow the source vocabulary; translation is the projection's job.
 """
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 
@@ -33,18 +34,12 @@ def _seen_columns() -> list[sa.Column]:
     return [
         sa.Column("s3_key", sa.Text),
         sa.Column(
-            "last_run_id",
+            "ingestion_run_id",
             sa.BigInteger,
             sa.ForeignKey("raw.ingestion_run.id", ondelete="SET NULL"),
         ),
         sa.Column(
-            "first_seen_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column(
-            "last_seen_at",
+            "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.func.now(),
@@ -80,7 +75,6 @@ ingestion_run = sa.Table(
 )
 
 
-
 # ── Referential ───────────────────────────────────────────────────────────────
 
 political_group = sa.Table(
@@ -103,10 +97,10 @@ deputy = sa.Table(
     sa.Column("first_name", sa.Text, nullable=False),
     sa.Column("last_name", sa.Text, nullable=False),
     sa.Column("birth_date", sa.Date),
-    # No column for these in the display schema; raw keeps them anyway.
     sa.Column("gender", sa.String(1)),
     sa.Column("profession", sa.Text),
     sa.Column("photo_url", sa.Text),
+    sa.Column("is_deputy", sa.Boolean, nullable=False, server_default=sa.true()),
     *_seen_columns(),
     sa.Index("ix_raw_deputy_legislature", "legislature"),
 )
@@ -125,13 +119,31 @@ mandate = sa.Table(
     sa.Column("legislature", sa.Integer, nullable=False),
     sa.Column("mandate_start", sa.Date),
     sa.Column("mandate_end", sa.Date),
-    # From the GP mandat (see mandate.py).
     sa.Column("group_uid", sa.String(100)),  # name and acronym: join political_group
     sa.Column("constituency_number", sa.Integer),
     sa.Column("department_name", sa.Text),
     sa.Column("department_number", sa.String(10)),
     sa.Column("seat_number", sa.Integer),
     sa.Index("ix_raw_mandate_deputy", "deputy_uid"),
+)
+
+government_role = sa.Table(
+    "government_role",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),
+    sa.Column(
+        "deputy_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.deputy.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("title", sa.Text),  # "Ministre déléguée", "Secrétaire d'État"
+    sa.Column("ministry_uid", sa.String(100)),
+    sa.Column("ministry", sa.Text),
+    sa.Column("start", sa.Date),
+    sa.Column("end", sa.Date),
+    sa.Index("ix_raw_government_role_deputy", "deputy_uid"),
 )
 
 
@@ -141,63 +153,110 @@ law = sa.Table(
     "law",
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
-    sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N47390"
-    # Join key for debates, which reference texte uids.
-    sa.Column("texte_uid", sa.String(100)),
+    sa.Column("dossier_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N53940"
     sa.Column("legislature", sa.Integer, nullable=False),
     # Never truncated here.
     sa.Column("title", sa.Text, nullable=False),
-    sa.Column("law_type", sa.String(50)),
-    sa.Column("initiateur_uid", sa.String(100)),
-    sa.Column("closure_status", sa.String(50)),
+    sa.Column("senate_url", sa.Text),
+    # procedureParlementaire: "1" projet, "2" proposition, "19" rapport, "8" résolution…
+    sa.Column("procedure_code", sa.String(10), nullable=False),
+    sa.Column("procedure_label", sa.Text),
+    # Deputies (PA…) who signed the initiative; empty for government texts.
+    sa.Column("initiator_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("withdrawn", sa.Boolean, nullable=False, server_default=sa.false()),
     *_seen_columns(),
-    sa.Index("ix_raw_law_texte_uid", "texte_uid"),
 )
 
 law_stage = sa.Table(
     "law_stage",
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("stage_uid", sa.String(100), nullable=False, unique=True),  # "DLR5L17N53940-AN1"
     sa.Column(
         "dossier_uid",
         sa.String(100),
         sa.ForeignKey("raw.law.dossier_uid", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("code", sa.String(50), nullable=False),
+    sa.Column("code", sa.String(50), nullable=False),  # "AN1", "SN1", "CMP", "PROM"…
     sa.Column("label", sa.Text, nullable=False),
-    sa.Column("updated_stage_date", sa.Date),
+    sa.Column("organe_ref", sa.String(100)),
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
-    sa.UniqueConstraint("dossier_uid", "code", "position", name="uq_raw_law_stage"),
+    sa.Column("started_at", sa.Date),
+    sa.Column("examined_at", sa.Date),
+    sa.Column("concluded_at", sa.Date),
+    sa.Column("decision", sa.Text),  # "adopté", "rejeté", "modifié"
+    sa.Column("decision_code", sa.String(20)),  # "TSORTF01", "TSORTF07"…
+    sa.Column("texte_uid", sa.String(100)),  # text deposited for this reading
+    sa.Column("commission_texte_uid", sa.String(100)),  # text adopted by the commission
+    sa.Column("adopted_texte_uid", sa.String(100)),  # text adopted in séance (BTA)
+    # Agenda uids of the public sittings (RUAN… / RUSN…): the law -> debate join.
+    sa.Column("sitting_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_law_stage_dossier", "dossier_uid"),
 )
 
-# Versioned: a changed text inserts a new row, the old one gets is_current=false.
+# One row per document of a dossier: deposited text, commission text, report.
+law_texte = sa.Table(
+    "law_texte",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "PRJLANR5L17B2681"
+    sa.Column(
+        "dossier_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.law.dossier_uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("kind", sa.String(20)),  # PRJL | PION | PNRE | RAPP | RINF…
+    sa.Column("sub_kind", sa.String(50)),
+    sa.Column("number", sa.Integer),  # the "n° 2681"
+    sa.Column("title", sa.Text),
+    sa.Column("short_title", sa.Text),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("author_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("organe_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_law_texte_dossier", "dossier_uid"),
+    sa.Index("ix_raw_law_texte_number", "legislature", "number"),
+)
+
+
+# One version of a law's text, scraped from the website (see law_text.py).
+# A uid never changes: fetched once. available = false remembers a 404.
+law_text = sa.Table(
+    "law_text",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("texte_uid", sa.String(100), nullable=False, unique=True),  # -> raw.law_texte.uid
+    sa.Column("dossier_uid", sa.String(100)),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("kind", sa.String(20)),  # deposited | commission | adopted
+    sa.Column("available", sa.Boolean, nullable=False, server_default=sa.true()),
+    sa.Column("source_url", sa.Text),
+    sa.Column("article_count", sa.Integer, nullable=False, server_default="0"),
+    *_seen_columns(),
+    sa.Index("ix_raw_law_text_dossier", "dossier_uid"),
+)
+
+# One article of one text version. Amendments target (texte_uid, article_ref).
 law_article = sa.Table(
     "law_article",
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
-    sa.Column("texte_uid", sa.String(100), nullable=False),
-    sa.Column("article_ref", sa.String(100), nullable=False),
-    sa.Column("article_number", sa.Integer),
-    sa.Column("legislature", sa.Integer, nullable=False),
-    sa.Column("content", sa.Text, nullable=False),
-    sa.Column("content_checksum", sa.String(64), nullable=False),
-    sa.Column("version_number", sa.Integer, nullable=False, server_default="1"),
-    sa.Column("is_current", sa.Boolean, nullable=False, server_default=sa.true()),
-    sa.Column("superseded_at", sa.DateTime(timezone=True)),
-    sa.Column("amendment_uid", sa.String(100)),
-    sa.Column("s3_key", sa.Text),
     sa.Column(
-        "scraped_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    ),
-    # One current version per article.
-    sa.Index(
-        "uq_raw_law_article_current",
         "texte_uid",
-        "article_ref",
-        unique=True,
-        postgresql_where=sa.text("is_current"),
+        sa.String(100),
+        sa.ForeignKey("raw.law_text.texte_uid", ondelete="CASCADE"),
+        nullable=False,
     ),
+    sa.Column("article_ref", sa.Text, nullable=False),  # "Article 2 bis"
+    sa.Column("is_new", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("position", sa.Integer, nullable=False),
+    sa.Column("section", sa.Text),
+    sa.Column("content", sa.Text),  # alinéas, one per line
+    sa.Column("mention", sa.Text),  # Supprimé | Non modifié | Conforme… (sometimes a sentence)
+    sa.UniqueConstraint("texte_uid", "position", name="uq_raw_law_article"),
+    sa.Index("ix_raw_law_article_ref", "texte_uid", "article_ref"),
 )
 
 
@@ -213,10 +272,11 @@ debate = sa.Table(
     sa.Column("session_number", sa.Integer),
     sa.Column("session_type", sa.String(50)),
     sa.Column("date", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("title", sa.Text),
     *_seen_columns(),
 )
 
-# Agenda item ("point d'ordre du jour"): the per-topic level.
+# Agenda item ("point d'ordre du jour"): the per-topic level. Points nest.
 debate_point = sa.Table(
     "debate_point",
     metadata,
@@ -227,9 +287,12 @@ debate_point = sa.Table(
         sa.ForeignKey("raw.debate.uid", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("point_uid", sa.String(100)),
+    sa.Column("point_uid", sa.String(100), nullable=False, unique=True),  # id_syceron
+    sa.Column("parent_uid", sa.String(100)),
     sa.Column("title", sa.Text),
+    sa.Column("kind", sa.String(50)),  # code_grammaire: QG_1_1, DISC_ARTICLES_3_1, …
     sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+    # Text NUMBERS (bibard), not uids: the join to a law goes through the number.
     sa.Column("texte_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
     sa.Index("ix_raw_debate_point_debate", "debate_uid"),
 )
@@ -244,11 +307,178 @@ intervention = sa.Table(
         sa.ForeignKey("raw.debate_point.id", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.Column("uid", sa.String(100)),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # id_syceron
     sa.Column("deputy_uid", sa.String(100)),
     sa.Column("speaker_name", sa.Text),
     sa.Column("speaker_type", sa.String(50)),
     sa.Column("content", sa.Text),
     sa.Column("order_in_debate", sa.Integer),
     sa.Index("ix_raw_intervention_point", "debate_point_id"),
+)
+
+
+# ── Agenda ────────────────────────────────────────────────────────────────────
+
+# One public sitting as scheduled. Exists before the sitting happens; once held,
+# compte_rendu_uid points at raw.debate.uid.
+agenda_item = sa.Table(
+    "agenda_item",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "RUANR5L17S2024IDS28538"
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("start_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("end_at", sa.DateTime(timezone=True)),
+    sa.Column("location", sa.Text),
+    sa.Column("state", sa.String(50)),  # "Confirmé" | "Supprimé"
+    sa.Column("compte_rendu_uid", sa.String(100)),  # -> raw.debate.uid, once held
+    sa.Column("session_rank", sa.String(20)),  # "Première" | "Deuxième" | "Unique"
+    sa.Column("session_number", sa.Integer),
+    *_seen_columns(),
+    sa.Index("ix_raw_agenda_item_start", "start_at"),
+    sa.Index("ix_raw_agenda_item_cr", "compte_rendu_uid"),
+)
+
+agenda_point = sa.Table(
+    "agenda_point",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "agenda_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.agenda_item.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("point_uid", sa.String(100), nullable=False, unique=True),
+    sa.Column("title", sa.Text),
+    sa.Column("kind", sa.String(100)),  # typePointODJ
+    sa.Column("state", sa.String(50)),
+    sa.Column("position", sa.Integer, nullable=False, server_default="0"),
+    # Law dossier uids ("DLR5L17N53818"): the clean debate -> law join.
+    sa.Column("dossier_refs", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Index("ix_raw_agenda_point_agenda", "agenda_uid"),
+)
+
+
+# ── Amendments ────────────────────────────────────────────────────────────────
+
+# One row per amendment, séance and commission alike. Bodies are the AN's HTML.
+amendment = sa.Table(
+    "amendment",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("dossier_uid", sa.String(100)),  # -> raw.law.dossier_uid
+    sa.Column("texte_uid", sa.String(100), nullable=False),  # -> raw.law_stage.texte_uid
+    sa.Column("examen_ref", sa.String(100)),
+    sa.Column("number", sa.String(20)),  # "225", "II-CF146"
+    sa.Column("rectification", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("examined_by", sa.String(50)),  # "AN" = séance publique, else a commission
+    sa.Column("parent_uid", sa.String(100)),  # sous-amendement
+    sa.Column("author_type", sa.String(50), nullable=False),  # Député | Rapporteur | Gouvernement
+    sa.Column("deputy_uid", sa.String(100)),
+    sa.Column("group_uid", sa.String(100)),
+    sa.Column("cosigner_uids", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("signatories", pg.ARRAY(sa.Text), nullable=False, server_default="{}"),
+    sa.Column("division_title", sa.Text),  # "Article 2"
+    sa.Column("division_type", sa.String(50)),
+    sa.Column("division_position", sa.String(20)),  # Avant | A | Après
+    sa.Column("alinea", sa.Text),  # "Après l'alinéa 34"
+    sa.Column("content", sa.Text),  # plain text, paragraphs separated by a blank line
+    sa.Column("summary", sa.Text),
+    sa.Column("deposited_at", sa.Date),
+    sa.Column("published_at", sa.Date),
+    sa.Column("state", sa.String(100)),
+    sa.Column("sub_state", sa.String(100)),
+    sa.Column("sort", sa.String(50)),
+    sa.Column("sorted_at", sa.DateTime(timezone=True)),
+    *_seen_columns(),
+    sa.Index("ix_raw_amendment_dossier", "dossier_uid"),
+    sa.Index("ix_raw_amendment_texte", "texte_uid"),
+    sa.Index("ix_raw_amendment_deputy", "deputy_uid"),
+)
+
+
+# ── Ballots ───────────────────────────────────────────────────────────────────
+
+ballot = sa.Table(
+    "ballot",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column("uid", sa.String(100), nullable=False, unique=True),  # "VTANR5L17V2657"
+    sa.Column("legislature", sa.Integer, nullable=False),
+    sa.Column("number", sa.Integer, nullable=False),
+    # The sitting: raw.agenda_item.uid, whose compte_rendu_uid leads to raw.debate.
+    sa.Column("agenda_uid", sa.String(100), nullable=False),
+    sa.Column("session_ref", sa.String(50)),
+    sa.Column("date", sa.Date, nullable=False),
+    sa.Column("kind", sa.String(10), nullable=False),  # SPO | SPS | MOC
+    sa.Column("kind_label", sa.Text),
+    sa.Column("majority_rule", sa.Text),
+    sa.Column("result", sa.String(20)),  # adopté | rejeté
+    sa.Column("title", sa.Text),
+    sa.Column("requested_by", sa.Text),
+    # From the source, filled in ~30 % of scrutins only.
+    sa.Column("dossier_uid", sa.String(100)),
+    # Resolved by the worker (title, agenda, decision date): the law voted on and,
+    # for a vote on an amendment, raw.amendment.uid.
+    sa.Column("resolved_dossier_uid", sa.String(100)),
+    sa.Column("resolved_amendment_uid", sa.String(100)),
+    sa.Column("location", sa.String(50)),
+    sa.Column("voters", sa.Integer),
+    sa.Column("expressed", sa.Integer),
+    sa.Column("required", sa.Integer),
+    sa.Column("for_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("against_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("abstention_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_voluntary_count", sa.Integer, nullable=False, server_default="0"),
+    *_seen_columns(),
+    sa.Index("ix_raw_ballot_agenda", "agenda_uid"),
+    sa.Index("ix_raw_ballot_dossier", "dossier_uid"),
+    sa.Index("ix_raw_ballot_resolved_dossier", "resolved_dossier_uid"),
+    sa.Index("ix_raw_ballot_resolved_amendment", "resolved_amendment_uid"),
+)
+
+# How each political group voted.
+ballot_group = sa.Table(
+    "ballot_group",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "ballot_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.ballot.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("group_uid", sa.String(100), nullable=False),
+    sa.Column("members", sa.Integer),
+    sa.Column("majority_position", sa.String(30)),
+    sa.Column("for_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("against_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("abstention_count", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("non_voting_count", sa.Integer, nullable=False, server_default="0"),
+    sa.UniqueConstraint("ballot_uid", "group_uid", name="uq_raw_ballot_group"),
+)
+
+# One deputy's position on one scrutin (~150 rows per ballot, ~1.3 M per legislature).
+ballot_vote = sa.Table(
+    "ballot_vote",
+    metadata,
+    sa.Column("id", sa.BigInteger, primary_key=True),
+    sa.Column(
+        "ballot_uid",
+        sa.String(100),
+        sa.ForeignKey("raw.ballot.uid", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    sa.Column("deputy_uid", sa.String(100), nullable=False),
+    sa.Column("mandate_uid", sa.String(100)),
+    sa.Column("group_uid", sa.String(100)),
+    sa.Column("position", sa.String(30), nullable=False),  # pour | contre | abstention | nonVotant…
+    sa.Column("by_delegation", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("corrected_position", sa.String(30)),  # "mise au point" declared afterwards
+    sa.UniqueConstraint("ballot_uid", "deputy_uid", name="uq_raw_ballot_vote"),
+    sa.Index("ix_raw_ballot_vote_deputy", "deputy_uid"),
 )

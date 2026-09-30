@@ -1,4 +1,5 @@
 """Dependency rule, enforced on real imports (AST), not on grep."""
+
 import ast
 from pathlib import Path
 
