@@ -18,6 +18,8 @@ COPY uv.lock* ./
 RUN uv sync --frozen --no-dev --no-cache
 
 
+COPY alembic.ini ./
+COPY migrations/ ./migrations/
 COPY src/ ./src/
 
 CMD ["uv", "run", "python", "-m", "src.main"]
