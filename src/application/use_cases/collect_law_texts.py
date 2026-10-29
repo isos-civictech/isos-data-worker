@@ -5,27 +5,14 @@ text (~400 KB), so the run is incremental by design: a text uid never changes.
 
 from loguru import logger
 
-from src.domain.ports.repositories.ingestion_log_repository import IngestionLogRepository
-from src.domain.ports.repositories.law_text_repository import LawTextRepository
-from src.domain.ports.sources.law_text_source import LawTextSource
+from src.application.use_cases._collect import CollectUseCase
 from src.domain.shared.results import SyncReport
 
 ENTITY = "law_text"
 
 
-class CollectLawTexts:
-    def __init__(
-        self,
-        *,
-        source: LawTextSource,
-        repository: LawTextRepository,
-        log_repository: IngestionLogRepository,
-        dry_run: bool = False,
-    ) -> None:
-        self._source = source
-        self._repository = repository
-        self._log = log_repository
-        self._dry_run = dry_run
+class CollectLawTexts(CollectUseCase):
+    entity = ENTITY
 
     async def execute(
         self,
@@ -35,8 +22,7 @@ class CollectLawTexts:
         texte_uid: str | None = None,
         limit: int | None = None,
     ) -> SyncReport:
-        report = SyncReport(entity=ENTITY)
-        run_id = await self._log.start_run(ENTITY)
+        report, run_id = await self._begin()
         if texte_uid:
             uids = [texte_uid]
         else:
@@ -52,27 +38,14 @@ class CollectLawTexts:
         )
 
         for uid in uids:
-            report.processed += 1
-            if self._dry_run:
-                report.skipped += 1
-                continue
-            try:
-                law_text = await self._source.fetch(uid, legislature)
-                if law_text is None:
-                    await self._repository.mark_unavailable(uid, run_id=run_id)
-                    report.skipped += 1
-                    continue
-                outcome = await self._repository.save(
-                    law_text, run_id=run_id, s3_key=getattr(self._source, "last_s3_key", None)
-                )
-            except Exception:
-                report.record_failure(uid)
-                logger.exception("collect.item_failed entity={} uid={}", ENTITY, uid)
-                continue
-            report.created += int(outcome.created)
-            report.updated += int(not outcome.created)
+            await self._save_item(
+                report, uid, lambda uid=uid: self._fetch_and_save(uid, legislature, run_id)
+            )
+        return await self._end(report, run_id)
 
-        report.finish()
-        await self._log.finish_run(run_id, report)
-        logger.info("collect.done {}", report.as_dict())
-        return report
+    async def _fetch_and_save(self, uid: str, legislature: int, run_id: int):
+        law_text = await self._source.fetch(uid, legislature)
+        if law_text is None:
+            await self._repository.mark_unavailable(uid, run_id=run_id)
+            return None
+        return await self._repository.save(law_text, run_id=run_id, s3_key=self._s3_key)
