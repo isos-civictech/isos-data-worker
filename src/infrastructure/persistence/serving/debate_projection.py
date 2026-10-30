@@ -18,7 +18,10 @@ from src.domain.shared.results import SyncReport
 from src.infrastructure.persistence.engine import transaction
 from src.infrastructure.persistence.raw import tables as raw
 from src.infrastructure.persistence.serving import tables as pub
-from src.infrastructure.persistence.serving.mappers.debate_mapper import debate_row
+from src.infrastructure.persistence.serving.mappers.debate_mapper import (
+    debate_row,
+    transcript_html,
+)
 from src.infrastructure.persistence.serving.slug import unique_slug
 
 WRITE_ONCE = ("slug",)
@@ -27,6 +30,22 @@ WRITE_ONCE = ("slug",)
 class SqlDebateProjection(DebateProjection):
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+
+    async def _speeches(self, debate_uid: str) -> list[dict]:
+        """The sitting's interventions in speaking order, with their agenda point."""
+        async with self._engine.connect() as connection:
+            result = await connection.execute(
+                sa.select(
+                    raw.debate_point.c.point_uid,
+                    raw.debate_point.c.title.label("point_title"),
+                    raw.intervention.c.speaker_name,
+                    raw.intervention.c.content,
+                )
+                .join(raw.debate_point, raw.debate_point.c.id == raw.intervention.c.debate_point_id)
+                .where(raw.debate_point.c.debate_uid == debate_uid)
+                .order_by(raw.intervention.c.order_in_debate, raw.intervention.c.id)
+            )
+            return [dict(r) for r in result.mappings().all()]
 
     async def project_all(self, legislature: int) -> SyncReport:
         report = SyncReport(entity="debate-projection")
@@ -57,6 +76,7 @@ class SqlDebateProjection(DebateProjection):
         for sitting in rows:
             report.processed += 1
             row = debate_row(dict(sitting))
+            row["content"] = transcript_html(await self._speeches(sitting["uid"]))
             row["external_id"] = sitting["agenda_uid"] or sitting["uid"]
             async with transaction(self._engine) as connection:
                 row["slug"] = await unique_slug(
