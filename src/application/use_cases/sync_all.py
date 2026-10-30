@@ -63,8 +63,10 @@ class SyncAll:
         }
         self._project = [
             ("deputies", project_deputies),
-            ("laws", project_laws),
+            # Agenda first: it creates the public.debate rows that laws link to
+            # (debate_law). Laws projected before it left every link missing.
             ("agenda", project_agenda),
+            ("laws", project_laws),
             ("debates", project_debates),
             ("amendments", project_amendments),
             ("law_texts", project_law_texts),
