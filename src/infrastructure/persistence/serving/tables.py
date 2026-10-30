@@ -70,6 +70,7 @@ debate = sa.Table(
     sa.Column("slug", sa.String(255), nullable=False),
     sa.Column("source_url", sa.Text),
     sa.Column("external_id", sa.String(100)),
+    sa.Column("content", sa.Text),  # full text of the sitting, HTML
     sa.Column("updated_at", sa.DateTime(timezone=True)),
 )
 

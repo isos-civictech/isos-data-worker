@@ -76,7 +76,9 @@ class SqlDebateProjection(DebateProjection):
         for sitting in rows:
             report.processed += 1
             row = debate_row(dict(sitting))
-            row["content"] = transcript_html(await self._speeches(sitting["uid"]))
+            # No speech yet: leave `content` out so an existing text is never blanked.
+            if content := transcript_html(await self._speeches(sitting["uid"])):
+                row["content"] = content
             row["external_id"] = sitting["agenda_uid"] or sitting["uid"]
             async with transaction(self._engine) as connection:
                 row["slug"] = await unique_slug(
