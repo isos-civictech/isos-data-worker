@@ -1,0 +1,27 @@
+name: Build and push image
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest   # runner amd64 : l'image tourne directement sur le cluster K3S
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/isos-civictech/isos-data-worker:${{ github.ref_name }}
+            ghcr.io/isos-civictech/isos-data-worker:${{ github.sha }}
