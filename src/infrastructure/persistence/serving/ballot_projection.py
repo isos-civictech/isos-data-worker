@@ -12,6 +12,7 @@ Links, in order of confidence:
 The resolved law and amendment are also written back to raw.ballot
 (resolved_dossier_uid, resolved_amendment_uid) so the chain can be followed
 there too. Lookups are loaded once; ~1.3 M deputy votes go in by pages.
+Deputy attendance is then rebuilt from every scrutin (participation_projection).
 """
 
 import sqlalchemy as sa
@@ -29,6 +30,9 @@ from src.infrastructure.persistence.serving.mappers.ballot_mapper import (
     deputy_vote_row,
 )
 from src.infrastructure.persistence.serving.mappers.law_mapper import READINGS
+from src.infrastructure.persistence.serving.participation_projection import (
+    refresh_participation,
+)
 from src.infrastructure.persistence.serving.slug import slugify
 
 
@@ -219,6 +223,8 @@ class SqlBallotProjection(BallotProjection):
                 created = await self._project_one(connection, dict(row), debate_id, lookups)
             report.created += int(created)
             report.updated += int(not created)
+        async with transaction(self._engine) as connection:
+            await refresh_participation(connection, legislature)
         return report.finish()
 
     async def _project_one(
