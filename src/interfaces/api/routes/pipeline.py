@@ -4,7 +4,8 @@ run report(s). Long runs (amendments, law texts) take minutes: call them from
 a job, not from a page.
 """
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from src.composition import build_worker
 from src.config import Settings
 from src.interfaces.api.dependencies import get_engine, get_settings_dep
+from src.interfaces.api.runs import RUNS
 from src.interfaces.dispatch import DATASETS, Selection, collect, project
 
 router = APIRouter(tags=["pipeline"])
@@ -71,10 +73,53 @@ async def sync_all(
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict:
     """Everything, in dependency order. Without `debates`, the whole legislature."""
-    async with build_worker(settings, engine, refresh=refresh) as worker:
-        return await worker.sync_all.execute(
-            legislature or settings.an_legislature, debates=debates
-        )
+
+    async def work() -> dict:
+        async with build_worker(settings, engine, refresh=refresh) as worker:
+            return await worker.sync_all.execute(
+                legislature or settings.an_legislature, debates=debates
+            )
+
+    return await RUNS.run("sync", work())
+
+
+WINDOW_DAYS = {"day": 0, "week": 6, "month": 29}
+
+
+@router.post("/sync/window")
+async def sync_window(
+    period: Literal["day", "week", "month"] = "day",
+    legislature: int | None = None,
+    refresh: bool = False,
+    settings: Settings = Depends(get_settings_dep),
+    engine: AsyncEngine = Depends(get_engine),
+) -> dict:
+    """The agenda whole, then the sittings of today / the last 7 days / the last 30 days.
+
+    Each sitting brings its comptes rendus, laws, amendments, law texts and scrutins.
+    """
+    today = datetime.now(tz=UTC).date()
+    since = today - timedelta(days=WINDOW_DAYS[period])
+
+    async def work() -> dict:
+        async with build_worker(settings, engine, refresh=refresh) as worker:
+            return await worker.sync_all.execute(
+                legislature or settings.an_legislature, since=since, until=today
+            )
+
+    return await RUNS.run(f"sync-{period}", work())
+
+
+@router.post("/cancel")
+async def cancel_run(engine: AsyncEngine = Depends(get_engine)) -> dict:
+    """Stop the run in progress, if any."""
+    cancelled = await RUNS.cancel(engine)
+    return {"cancelled": cancelled}
+
+
+@router.get("/run")
+async def current_run() -> dict:
+    return {"running": RUNS.running, "name": RUNS.name}
 
 
 @router.post("/sync/{dataset}")
@@ -91,12 +136,16 @@ async def sync_dataset(
     """Collect then project one dataset."""
     _check(dataset)
     leg = legislature or settings.an_legislature
-    async with build_worker(settings, engine, refresh=refresh) as worker:
-        collected = await collect(
-            worker, dataset, leg, Selection(dossier=dossier, since=since, until=until)
-        )
-        projected = await project(worker, dataset, leg)
-    return {"collect": collected.as_dict(), "project": projected.as_dict()}
+
+    async def work() -> dict:
+        async with build_worker(settings, engine, refresh=refresh) as worker:
+            collected = await collect(
+                worker, dataset, leg, Selection(dossier=dossier, since=since, until=until)
+            )
+            projected = await project(worker, dataset, leg)
+        return {"collect": collected.as_dict(), "project": projected.as_dict()}
+
+    return await RUNS.run(f"sync-{dataset}", work())
 
 
 @router.post("/refresh")
@@ -109,10 +158,14 @@ async def refresh_archives(
     engine: AsyncEngine = Depends(get_engine),
 ) -> dict:
     """Re-download the Assemblée archives into S3. The database is not touched."""
-    async with build_worker(settings, engine) as worker:
-        unknown = set(datasets or []) - set(worker.refresh_archives.datasets)
-        if unknown:
-            raise HTTPException(status_code=404, detail=f"unknown datasets {sorted(unknown)}")
-        return await worker.refresh_archives.execute(
-            legislature or settings.an_legislature, datasets
-        )
+
+    async def work() -> dict:
+        async with build_worker(settings, engine) as worker:
+            unknown = set(datasets or []) - set(worker.refresh_archives.datasets)
+            if unknown:
+                raise HTTPException(status_code=404, detail=f"unknown datasets {sorted(unknown)}")
+            return await worker.refresh_archives.execute(
+                legislature or settings.an_legislature, datasets
+            )
+
+    return await RUNS.run("refresh", work())
