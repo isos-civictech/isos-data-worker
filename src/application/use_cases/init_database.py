@@ -18,6 +18,7 @@ from src.application.use_cases.project_amendments import ProjectAmendments
 from src.application.use_cases.project_ballots import ProjectBallots
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.application.use_cases.project_laws import ProjectLaws
+from src.application.use_cases.purge_raw import PurgeRaw
 
 
 class InitDatabase:
@@ -34,7 +35,9 @@ class InitDatabase:
         project_laws: ProjectLaws,
         project_amendments: ProjectAmendments,
         project_ballots: ProjectBallots,
+        purge_raw: PurgeRaw | None = None,
     ) -> None:
+        self._purge_raw = purge_raw
         self._steps = [
             ("collect.deputies", collect_deputies),
             ("collect.agenda", collect_agenda),
@@ -54,5 +57,10 @@ class InitDatabase:
         reports = {}
         for name, use_case in self._steps:
             reports[name] = (await use_case.execute(legislature)).as_dict()
+        if self._purge_raw is not None:
+            try:
+                reports["purge.raw"] = await self._purge_raw.execute()
+            except Exception:
+                logger.exception("purge.raw failed, the initialisation itself succeeded")
         logger.info("init.done steps={}", len(reports))
         return reports

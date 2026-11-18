@@ -27,6 +27,7 @@ from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.application.use_cases.project_law_texts import ProjectLawTexts
 from src.application.use_cases.project_laws import ProjectLaws
+from src.application.use_cases.purge_raw import PurgeRaw
 from src.domain.ports.repositories.agenda_repository import AgendaRepository
 from src.domain.shared.results import SyncReport
 
@@ -50,7 +51,9 @@ class SyncAll:
         project_amendments: ProjectAmendments,
         project_ballots: ProjectBallots,
         project_law_texts: ProjectLawTexts,
+        purge_raw: PurgeRaw | None = None,
     ) -> None:
+        self._purge_raw = purge_raw
         self._agenda_repository = agenda_repository
         self._collect = {
             "deputies": collect_deputies,
@@ -145,8 +148,14 @@ class SyncAll:
         for name, use_case in self._project:
             reports[f"project.{name}"] = await use_case.execute(legislature)
 
-        logger.info("sync.done steps={}", len(reports))
-        return {step: report.as_dict() for step, report in reports.items()}
+        results = {step: report.as_dict() for step, report in reports.items()}
+        if self._purge_raw is not None:
+            try:
+                results["purge.raw"] = await self._purge_raw.execute()
+            except Exception:
+                logger.exception("purge.raw failed, the sync itself succeeded")
+        logger.info("sync.done steps={}", len(results))
+        return results
 
 
 def _merge(entity: str, reports: list[SyncReport]) -> SyncReport:
