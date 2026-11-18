@@ -37,6 +37,9 @@ class _FakeResult:
     def all(self):
         return self._rows
 
+    def scalar(self):
+        return self._rows[0] if self._rows else False
+
 
 class FakeEngine:
     def __init__(self, rows=None, fail=False):
@@ -115,6 +118,7 @@ def test_every_trigger_route_is_a_post(client):
         "/sync/{dataset}",
         "/sync/all",
         "/refresh",
+        "/init",
     ):
         assert "post" in paths[route], f"{route} must be a POST"
 
@@ -142,3 +146,31 @@ def test_agenda_read_routes(client):
         response = client.get(route)
         assert response.status_code == 200, route
         assert response.json() == []
+
+
+def test_init_status_reports_an_empty_database(client):
+    response = client.get("/init")
+
+    assert response.status_code == 200
+    assert response.json() == {"initialised": False, "running": False}
+
+
+def test_init_status_reports_an_initialised_database():
+    app = create_app()
+    app.dependency_overrides[get_engine] = lambda: FakeEngine(rows=[True])
+
+    with TestClient(app) as test_client:
+        response = test_client.get("/init")
+
+    assert response.json()["initialised"] is True
+
+
+def test_init_is_refused_when_the_database_already_holds_data():
+    app = create_app()
+    app.dependency_overrides[get_settings_dep] = lambda: Settings()
+    app.dependency_overrides[get_engine] = lambda: FakeEngine(rows=[True])
+
+    with TestClient(app) as test_client:
+        response = test_client.post("/init")
+
+    assert response.status_code == 409
