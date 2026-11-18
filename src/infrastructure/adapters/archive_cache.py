@@ -18,13 +18,24 @@ async def load_archive(
     key: str,
     content_type: str = "application/zip",
     refresh: bool = False,
+    strict: bool = False,
 ) -> bytes:
+    """S3 first. With `refresh`, a failed download falls back to the stored copy unless `strict`."""
     if not refresh:
         cached = await storage.get(key)
         if cached is not None:
             logger.info("archive.from_s3 key={} bytes={}", key, len(cached))
             return cached
-    payload = await http.get_bytes(url)
+    try:
+        payload = await http.get_bytes(url)
+    except Exception:
+        stale = None if strict else await storage.get(key)
+        if stale is None:
+            raise
+        logger.warning(
+            "archive.refresh_failed_using_s3 url={} key={} bytes={}", url, key, len(stale)
+        )
+        return stale
     await storage.put(key, payload, content_type=content_type)
     logger.info("archive.downloaded url={} key={} bytes={}", url, key, len(payload))
     return payload
