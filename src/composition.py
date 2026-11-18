@@ -24,6 +24,7 @@ from src.application.use_cases.project_debates import ProjectDebates
 from src.application.use_cases.project_deputies import ProjectDeputies
 from src.application.use_cases.project_law_texts import ProjectLawTexts
 from src.application.use_cases.project_laws import ProjectLaws
+from src.application.use_cases.purge_raw import PurgeRaw
 from src.application.use_cases.refresh_archives import RefreshArchives
 from src.application.use_cases.sync_all import SyncAll
 from src.config import Settings
@@ -47,6 +48,7 @@ from src.infrastructure.persistence.raw.ingestion_log_repository import (
 )
 from src.infrastructure.persistence.raw.law_repository import SqlRawLawRepository
 from src.infrastructure.persistence.raw.law_text_repository import SqlRawLawTextRepository
+from src.infrastructure.persistence.raw.purge_repository import SqlRawPurge
 from src.infrastructure.persistence.serving.agenda_projection import SqlAgendaProjection
 from src.infrastructure.persistence.serving.amendment_projection import SqlAmendmentProjection
 from src.infrastructure.persistence.serving.ballot_projection import SqlBallotProjection
@@ -112,6 +114,7 @@ class Worker:
     refresh_archives: RefreshArchives
     sync_all: SyncAll
     init_database: InitDatabase
+    purge_raw: PurgeRaw
 
 
 @asynccontextmanager
@@ -188,6 +191,9 @@ async def build_worker(
             project_ballots=ProjectBallots(projection=SqlBallotProjection(engine)),
             project_law_texts=ProjectLawTexts(projection=SqlLawTextProjection(engine)),
         )
+        purge_raw = PurgeRaw(
+            repository=SqlRawPurge(engine), retention_days=settings.raw_retention_days
+        )
         yield Worker(
             **collect,
             **project,
@@ -201,8 +207,12 @@ async def build_worker(
                     "ballots": ballots,
                 }
             ),
-            sync_all=SyncAll(agenda_repository=agenda_repository, **collect, **project),
+            purge_raw=purge_raw,
+            sync_all=SyncAll(
+                agenda_repository=agenda_repository, purge_raw=purge_raw, **collect, **project
+            ),
             init_database=InitDatabase(
-                **{k: v for k, v in (collect | project).items() if k in INIT_STEPS}
+                purge_raw=purge_raw,
+                **{k: v for k, v in (collect | project).items() if k in INIT_STEPS},
             ),
         )
