@@ -174,3 +174,10 @@ def test_init_is_refused_when_the_database_already_holds_data():
         response = test_client.post("/init")
 
     assert response.status_code == 409
+
+
+def test_cancel_without_a_run_answers_null(client):
+    response = client.post("/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"cancelled": None}
