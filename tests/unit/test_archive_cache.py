@@ -1,3 +1,5 @@
+import pytest
+
 from src.infrastructure.adapters.archive_cache import load_archive
 from tests.adapters.test_an_deputy_adapter import InMemoryStorage
 
@@ -33,3 +35,33 @@ async def test_refresh_downloads_even_when_present():
 
     assert await load_archive(http, storage, url="u", key="raw/x.zip", refresh=True) == b"fresh"
     assert storage.objects["raw/x.zip"] == b"fresh"
+
+
+class BrokenHttp:
+    async def get_bytes(self, url):
+        raise ConnectionError("peer closed connection")
+
+
+async def test_failed_refresh_falls_back_to_s3_copy():
+    storage = InMemoryStorage()
+    storage.objects["raw/x.zip"] = b"stale"
+
+    assert (
+        await load_archive(BrokenHttp(), storage, url="u", key="raw/x.zip", refresh=True)
+        == b"stale"
+    )
+
+
+async def test_strict_refresh_does_not_hide_the_failure():
+    storage = InMemoryStorage()
+    storage.objects["raw/x.zip"] = b"stale"
+
+    with pytest.raises(ConnectionError):
+        await load_archive(
+            BrokenHttp(), storage, url="u", key="raw/x.zip", refresh=True, strict=True
+        )
+
+
+async def test_failed_download_without_s3_copy_raises():
+    with pytest.raises(ConnectionError):
+        await load_archive(BrokenHttp(), InMemoryStorage(), url="u", key="raw/x.zip")

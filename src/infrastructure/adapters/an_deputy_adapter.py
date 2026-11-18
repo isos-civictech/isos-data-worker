@@ -107,6 +107,7 @@ class AnDeputyAdapter(DeputySource, ArchiveSource):
             url=self.archive_url(legislature),
             key=self.archive_key(legislature),
             refresh=True,
+            strict=True,
         )
         return self.archive_key(legislature)
 
