@@ -9,7 +9,21 @@ permissions:
   packages: write
 
 jobs:
+  # Lint + tests unitaires : l'image n'est construite que si tout passe.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Dépendances (dont le groupe dev)
+        run: uv sync --frozen
+      - name: Lint (ruff)
+        run: uv run ruff check .
+      - name: Tests (pytest)
+        run: uv run pytest -q
+
   build:
+    needs: test
     runs-on: ubuntu-latest   # runner amd64 : l'image tourne directement sur le cluster K3S
     steps:
       - uses: actions/checkout@v4
