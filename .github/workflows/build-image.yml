@@ -39,3 +39,30 @@ jobs:
           tags: |
             ghcr.io/isos-civictech/isos-data-worker:${{ github.ref_name }}
             ghcr.io/isos-civictech/isos-data-worker:${{ github.sha }}
+
+  # Déploiement continu de l'intégration : écrit le tag de l'image (sha du commit) dans
+  # isos-ops/k3s/envs/int/kustomization.yaml ; ArgoCD déploie ensuite tout seul.
+  deploy-int:
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mettre à jour le tag de l'intégration dans isos-ops
+        env:
+          KEY: ${{ secrets.ISOS_OPS_DEPLOY_KEY }}
+          IMG: ghcr.io/isos-civictech/isos-data-worker
+        run: |
+          mkdir -p ~/.ssh && printf '%s\n' "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          git clone -q --depth 5 git@github.com:isos-civictech/isos-ops.git ops && cd ops
+          git config user.name "isos-ci" && git config user.email "isos-ci@users.noreply.github.com"
+          F=k3s/envs/int/kustomization.yaml
+          # Les 3 repos peuvent pousser en même temps : on réessaie après un rebase.
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase
+            sed -i "\#name: $IMG\$#{n;s#newTag: .*#newTag: $GITHUB_SHA#}" "$F"
+            if git diff --quiet; then echo "tag déjà à jour"; exit 0; fi
+            git commit -qam "deploy(int): ${IMG##*/} ${GITHUB_SHA::7}" && git push -q && { echo "intégration → ${GITHUB_SHA::7}"; exit 0; }
+            git reset -q --hard origin/main; sleep $((i * 3))
+          done
+          exit 1
