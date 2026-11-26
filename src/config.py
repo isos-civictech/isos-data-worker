@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # ── Source : Assemblée nationale ──────────────────────────────────────────
     an_base_url: str = "https://data.assemblee-nationale.fr"
+    raw_retention_days: int = 90
     an_legislature: int = 17
 
     # ── Database ──────────────────────────────────────────────────────
