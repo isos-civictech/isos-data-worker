@@ -38,15 +38,34 @@ class SqlRawAgendaRepository(AgendaRepository):
     async def latest_held(
         self, legislature: int, count: int, before: datetime
     ) -> list[SittingLink]:
-        item, point = tables.agenda_item, tables.agenda_point
+        item = tables.agenda_item
         latest = (
             sa.select(item.c.uid, item.c.compte_rendu_uid)
             .where(item.c.legislature == legislature, item.c.start_at < before)
             .order_by(item.c.start_at.desc())
             .limit(count)
         )
+        return await self._links(latest)
+
+    async def held_between(
+        self, legislature: int, start: datetime, end: datetime
+    ) -> list[SittingLink]:
+        item = tables.agenda_item
+        window = (
+            sa.select(item.c.uid, item.c.compte_rendu_uid)
+            .where(
+                item.c.legislature == legislature,
+                item.c.start_at >= start,
+                item.c.start_at < end,
+            )
+            .order_by(item.c.start_at)
+        )
+        return await self._links(window)
+
+    async def _links(self, sittings_query) -> list[SittingLink]:
+        point = tables.agenda_point
         async with self._engine.connect() as connection:
-            sittings = (await connection.execute(latest)).all()
+            sittings = (await connection.execute(sittings_query)).all()
             uids = [uid for uid, _ in sittings]
             refs = (
                 await connection.execute(

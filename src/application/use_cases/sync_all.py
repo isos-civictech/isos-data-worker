@@ -9,7 +9,7 @@ Scoped run:   `debates=N` — every deputy, then only the N most recent sittings
               only what is kept in the database is scoped.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 
 from loguru import logger
 
@@ -63,32 +63,52 @@ class SyncAll:
         }
         self._project = [
             ("deputies", project_deputies),
-            ("laws", project_laws),
+            # Agenda first: it creates the public.debate rows that laws link to
+            # (debate_law). Laws projected before it left every link missing.
             ("agenda", project_agenda),
+            ("laws", project_laws),
             ("debates", project_debates),
             ("amendments", project_amendments),
             ("law_texts", project_law_texts),
             ("ballots", project_ballots),
         ]
 
-    async def execute(self, legislature: int, *, debates: int | None = None) -> dict[str, dict]:
-        """Reports by step, in the order they ran."""
+    async def execute(
+        self,
+        legislature: int,
+        *,
+        debates: int | None = None,
+        since: date | None = None,
+        until: date | None = None,
+    ) -> dict[str, dict]:
+        """Reports by step, in the order they ran.
+
+        The agenda is always collected whole, future sittings included. `debates` or a
+        `since`/`until` window then scope what hangs off the sittings.
+        """
         reports: dict[str, SyncReport] = {}
-        logger.info("sync.start legislature={} scope={}", legislature, debates or "all")
+        scope = f"{since}..{until}" if since or until else debates or "all"
+        logger.info("sync.start legislature={} scope={}", legislature, scope)
 
         reports["collect.deputies"] = await self._collect["deputies"].execute(legislature)
-        reports["collect.agenda"] = await self._collect["agenda"].execute(legislature, last=debates)
+        reports["collect.agenda"] = await self._collect["agenda"].execute(legislature)
 
-        if debates is None:
+        if debates is None and since is None and until is None:
             reports["collect.debates"] = await self._collect["debates"].execute(legislature)
             reports["collect.laws"] = await self._collect["laws"].execute(legislature)
             reports["collect.amendments"] = await self._collect["amendments"].execute(legislature)
             reports["collect.law_texts"] = await self._collect["law_texts"].execute(legislature)
             reports["collect.ballots"] = await self._collect["ballots"].execute(legislature)
         else:
-            sittings = await self._agenda_repository.latest_held(
-                legislature, debates, before=datetime.now(tz=UTC)
-            )
+            if debates is not None:
+                sittings = await self._agenda_repository.latest_held(
+                    legislature, debates, before=datetime.now(tz=UTC)
+                )
+            else:
+                start = datetime.combine(since or date(2000, 1, 1), time.min, tzinfo=UTC)
+                end = datetime.combine(until or date(2999, 12, 31), time.min, tzinfo=UTC)
+                end += timedelta(days=1)
+                sittings = await self._agenda_repository.held_between(legislature, start, end)
             agenda_uids = {s.uid for s in sittings}
             compte_rendus = {s.compte_rendu_uid for s in sittings if s.compte_rendu_uid}
             dossiers = set().union(*(s.dossier_uids for s in sittings)) if sittings else set()

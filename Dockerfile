@@ -18,6 +18,11 @@ COPY uv.lock* ./
 RUN uv sync --frozen --no-dev --no-cache
 
 
+COPY alembic.ini ./
+COPY migrations/ ./migrations/
 COPY src/ ./src/
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["uv", "run", "python", "-m", "src.main"]

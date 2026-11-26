@@ -16,6 +16,7 @@ from src.application.use_cases.collect_debates import CollectDebates
 from src.application.use_cases.collect_deputies import CollectDeputies
 from src.application.use_cases.collect_law_texts import CollectLawTexts
 from src.application.use_cases.collect_laws import CollectLaws
+from src.application.use_cases.init_database import InitDatabase
 from src.application.use_cases.project_agenda import ProjectAgenda
 from src.application.use_cases.project_amendments import ProjectAmendments
 from src.application.use_cases.project_ballots import ProjectBallots
@@ -57,6 +58,18 @@ from src.infrastructure.storage.garage_s3_adapter import GarageS3Storage
 
 # The biggest archives (amendments 340 MB, debates 55 MB) need a longer timeout.
 LONG_TIMEOUT_S = 600.0
+INIT_STEPS = {
+    "collect_deputies",
+    "collect_agenda",
+    "collect_laws",
+    "collect_amendments",
+    "collect_ballots",
+    "project_deputies",
+    "project_agenda",
+    "project_laws",
+    "project_amendments",
+    "project_ballots",
+}
 
 
 def build_engine(settings: Settings) -> AsyncEngine:
@@ -98,6 +111,7 @@ class Worker:
     project_law_texts: ProjectLawTexts
     refresh_archives: RefreshArchives
     sync_all: SyncAll
+    init_database: InitDatabase
 
 
 @asynccontextmanager
@@ -188,4 +202,7 @@ async def build_worker(
                 }
             ),
             sync_all=SyncAll(agenda_repository=agenda_repository, **collect, **project),
+            init_database=InitDatabase(
+                **{k: v for k, v in (collect | project).items() if k in INIT_STEPS}
+            ),
         )

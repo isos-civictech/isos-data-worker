@@ -31,3 +31,10 @@ class AgendaRepository(ABC):
     ) -> list[SittingLink]:
         """The `count` most recent sittings started before `before`, newest first."""
         ...
+
+    @abstractmethod
+    async def held_between(
+        self, legislature: int, start: datetime, end: datetime
+    ) -> list[SittingLink]:
+        """The sittings started in [start, end), oldest first."""
+        ...
